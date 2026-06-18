@@ -26,21 +26,70 @@ l'utilisateur**.
 
 ## Installation
 
+> **Prérequis** : `git` et Python 3.8+ installés.
+
+### ⚡ Installation rapide (une ligne)
+
+**Linux / macOS** (dans un terminal) :
+
 ```bash
-# 1. Cloner / copier le projet, puis se placer dedans
+curl -fsSL https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.sh | sh
+```
+
+**Windows** (dans PowerShell) :
+
+```powershell
+irm https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.ps1 | iex
+```
+
+Le script clone le dépôt, installe les dépendances, crée la commande `baziz.ia`
+et prépare le fichier `.env`. Il ne reste qu'à y mettre votre clé API.
+
+---
+
+### 🛠️ Installation manuelle
+
+<details>
+<summary><b>Linux / macOS</b></summary>
+
+```bash
+# 1. Cloner le dépôt
+git clone https://github.com/b4z1z/retroai-agent.git
 cd retroai-agent
 
-# 2. (Recommandé) créer un environnement virtuel
+# 2. (Recommandé) environnement virtuel
 python3 -m venv .venv
-source .venv/bin/activate        # Windows : .venv\Scripts\activate
+source .venv/bin/activate
 
-# 3. Installer les dépendances
-pip install -r requirements.txt
+# 3. Installer (crée la commande "baziz.ia")
+pip install -e .
 
 # 4. Configurer la clé API
-cp .env.example .env             # Windows (cmd) : copy .env.example .env
-# puis éditer .env et renseigner NVIDIA_API_KEY
+cp .env.example .env
+nano .env            # renseigner NVIDIA_API_KEY
 ```
+</details>
+
+<details>
+<summary><b>Windows (PowerShell / cmd)</b></summary>
+
+```powershell
+# 1. Cloner le dépôt
+git clone https://github.com/b4z1z/retroai-agent.git
+cd retroai-agent
+
+# 2. (Recommandé) environnement virtuel
+python -m venv .venv
+.venv\Scripts\activate
+
+# 3. Installer (crée la commande "baziz.ia")
+pip install -e .
+
+# 4. Configurer la clé API
+copy .env.example .env
+notepad .env         # renseigner NVIDIA_API_KEY
+```
+</details>
 
 ### Obtenir une clé API
 

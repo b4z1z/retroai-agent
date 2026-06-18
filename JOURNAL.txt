@@ -839,3 +839,51 @@ TESTS REALISES :
   - "/exit" -> grand AU REVOIR pixelise affiche.                      OK
 
 ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Mise en ligne sur GitHub
+----------------------------------------------------------------
+OBJECTIF :
+  Publier le projet sur GitHub.
+
+ACTIONS (faites par l'utilisateur) :
+  - Depot cree sur github.com : https://github.com/b4z1z/retroai-agent
+  - git branch -M main ; git remote add origin <url> ; git push -u origin main
+  - Push OK : branche main creee, suit origin/main.
+
+SECURITE :
+  - Verifie via .gitignore que .env / user_profile.json /
+    session_history.json ne sont PAS suivis (seul .env.example l'est).
+  - A confirmer visuellement sur la page GitHub que .env n'apparait pas.
+
+ETAT : EN LIGNE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Scripts d'installation + README Linux/Windows
+----------------------------------------------------------------
+OBJECTIF :
+  1) Separer les instructions d'install Linux et Windows dans le README.
+  2) Permettre une install en une ligne (curl | sh) facon installeurs.
+
+FICHIERS CREES :
+  - scripts/install.sh  (Linux/macOS : verifie git+python3, clone/maj,
+    pip install -e ., cree .env depuis .env.example).
+  - scripts/install.ps1 (Windows PowerShell : equivalent).
+
+FICHIERS MODIFIES :
+  - README.md : section Installation refondue ->
+    * "Installation rapide (une ligne)" : curl|sh (Linux) et irm|iex (Win).
+    * "Installation manuelle" en deux blocs <details> Linux / Windows.
+
+REPONSE A LA QUESTION (curl one-liner) :
+  - OUI possible. URL propre = raw.githubusercontent.com/<user>/<repo>/
+    <branch>/<path> (le blob/...?raw=1 marche aussi via redirection -L).
+  - "| sh" = Linux/macOS seulement ; Windows -> script .ps1 via irm|iex.
+
+A FAIRE PAR L'UTILISATEUR :
+  - git add . ; git commit ; git push  (les one-liners ne marcheront
+    qu'une fois scripts/ pousse sur la branche main de GitHub).
+
+ETAT : TERMINEE (a pousser).
