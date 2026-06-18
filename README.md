@@ -97,6 +97,17 @@ Créez une clé sur [build.nvidia.com](https://build.nvidia.com/) (elle commence
 par `nvapi-`). **Ne la mettez jamais en dur dans le code** : elle vit uniquement
 dans `.env` (ignoré par git) ou dans une variable d'environnement.
 
+> ⚠️ **`.env` vs `.env.example` — à ne pas confondre :**
+>
+> | Fichier | Rôle | Suivi par git ? | Votre vraie clé ? |
+> |---|---|:---:|:---:|
+> | `.env.example` | Modèle public (montre les variables) | ✅ oui | ❌ **jamais** (garder `nvapi-xxxx`) |
+> | `.env` | Votre configuration locale réelle | ❌ non (ignoré) | ✅ **oui**, ici |
+>
+> Concrètement : `cp .env.example .env`, puis éditez **uniquement `.env`**.
+> Mettre la clé dans `.env.example` la **publierait sur GitHub** → fuite de
+> secret. Ne touchez donc jamais à `.env.example`.
+
 ---
 
 ## Configuration (`.env`)

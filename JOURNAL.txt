@@ -912,3 +912,29 @@ TESTS REALISES :
   - Banniere affiche "made by baziz · github.com/b4z1z".              OK
 
 ETAT : TERMINEE (LICENSE a faire plus tard).
+
+
+----------------------------------------------------------------
+IDEES FUTURES (a faire plus tard, pas aujourd'hui)
+----------------------------------------------------------------
+- [ ] SYSTEME DE PLUGINS : permettre d'ajouter de nouveaux outils a
+      l'agent sans modifier le coeur. Piste : un dossier "plugins/",
+      chaque plugin expose un schema JSON + une fonction ; chargement
+      dynamique au demarrage et fusion dans TOOLS / TOOLS_SCHEMA.
+- [ ] LICENSE (choix en attente : MIT ou Tous droits reserves).
+- [ ] Interrupteur de test des pannes API (simuler un echec a l'etape N).
+- [ ] Tests automatises (pytest).
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - README : clarifier .env vs .env.example
+----------------------------------------------------------------
+OBJECTIF :
+  Preciser dans le README qu'on met la cle UNIQUEMENT dans .env, jamais
+  dans .env.example (qui est public sur GitHub).
+
+FICHIERS MODIFIES :
+  - README.md : section "Obtenir une cle API" -> encadre + tableau
+    .env vs .env.example (lequel est suivi par git, ou mettre la cle).
+
+ETAT : TERMINEE.
