@@ -233,3 +233,12 @@ main.py  ──saisie──>  agent_loop.py  ──requête──>  api_client.p
 - Détection de commandes dangereuses (`rm -rf`, `mkfs`, `dd`, fork bomb…) avec
   avertissement renforcé.
 - En cas d'entrée coupée, la réponse par défaut est **le refus**.
+
+---
+
+## Auteur
+
+**Made by B4Z1Z** 🖋️
+Conçu et développé par **B4Z1Z** — [github.com/b4z1z](https://github.com/b4z1z)
+
+Si vous réutilisez ou partagez ce projet, merci de conserver cette mention.

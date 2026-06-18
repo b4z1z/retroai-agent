@@ -16,6 +16,7 @@ version = "0.1.0"
 description = "BAZIZ.IA - client CLI leger pour agent autonome via l'API NVIDIA NIM"
 readme = "README.md"
 requires-python = ">=3.8"
+authors = [{ name = "B4Z1Z", email = "bazizdev07@gmail.com" }]
 dependencies = [
     "requests>=2.31.0",
     # Interface soignee (repli texte simple si absentes - voir ui.py).

@@ -111,7 +111,8 @@ def banniere(modele: str) -> None:
         contenu = Text(justify="center")
         contenu.append(LOGO + "\n\n", style=f"bold {ACCENT}")
         contenu.append("Agent autonome CLI  ·  NVIDIA NIM\n", style="default")
-        contenu.append(f"Modele : {modele}\n\n", style=DIM)
+        contenu.append(f"Modele : {modele}\n", style=DIM)
+        contenu.append("made by B4Z1Z · github.com/b4z1z\n\n", style=DIM)
         contenu.append("/help", style=f"bold {ACCENT}")
         contenu.append(" aide     ", style=DIM)
         contenu.append("/continue", style=f"bold {ACCENT}")
@@ -128,6 +129,7 @@ def banniere(modele: str) -> None:
     else:
         print("=" * 70)
         print("   BAZIZ.IA  -  client CLI pour agent autonome (NIM)")
+        print("   made by B4Z1Z · github.com/b4z1z")
         print(f"   Modele : {modele}")
         print("   /help aide · /continue reprendre · /reset effacer · /exit quitter")
         print("=" * 70)

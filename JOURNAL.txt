@@ -887,3 +887,28 @@ A FAIRE PAR L'UTILISATEUR :
     qu'une fois scripts/ pousse sur la branche main de GitHub).
 
 ETAT : TERMINEE (a pousser).
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Signature / branding "made by baziz"
+----------------------------------------------------------------
+OBJECTIF :
+  Apposer la signature de l'auteur (baziz) a plusieurs endroits pour
+  l'attribution / la reconnaissance du projet.
+
+FICHIERS MODIFIES :
+  - __init__.py   : docstring "Made by baziz" + __author__ + __url__.
+  - ui.py         : banniere -> ligne "made by baziz · github.com/b4z1z"
+    (versions rich ET fallback texte).
+  - pyproject.toml: authors = [{ name = "baziz", email = ... }].
+  - README.md     : section "Auteur" (Made by baziz + lien GitHub).
+
+NOTE :
+  - La signature = branding (effacable). La VRAIE preuve d'anteriorite =
+    l'historique git (commits dates + nom/email) + un fichier LICENSE.
+  - LICENSE non encore choisie (decision en attente de l'utilisateur).
+
+TESTS REALISES :
+  - Banniere affiche "made by baziz · github.com/b4z1z".              OK
+
+ETAT : TERMINEE (LICENSE a faire plus tard).
