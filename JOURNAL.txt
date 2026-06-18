@@ -1,0 +1,536 @@
+================================================================
+ RETROAI AGENT - JOURNAL DE BORD
+================================================================
+ Ce fichier trace, a chaque changement :
+   - les ETAPES suivies
+   - les BUGS / ERREURS rencontres et leur correction
+   - les OBSTACLES et decisions techniques
+ Mis a jour par l'assistant a chaque modification du projet.
+================================================================
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 1 - Fondations (config + structure)
+----------------------------------------------------------------
+OBJECTIF :
+  Poser le socle du projet : structure du package, dependances,
+  et gestion centralisee de la configuration.
+
+FICHIERS CREES :
+  - .env.example                      (modele de configuration)
+  - requirements.txt                  (requests obligatoire, rich optionnel)
+  - retroai_agent/__init__.py         (marque le dossier comme package Python)
+  - retroai_agent/config.py           (dataclass Config + load_config())
+
+DECISIONS TECHNIQUES :
+  - Parser .env "maison" (zero dependance) pour rester ultra-leger,
+    conformement au cahier des charges (cible : Core 2 Duo, 4 Go RAM).
+  - Variables d'environnement SYSTEME prioritaires sur le fichier .env
+    (on n'ecrase pas une variable deja definie).
+  - Validation "fail fast" : SystemExit immediat si NVIDIA_API_KEY absente,
+    plutot qu'un 401 obscur plus tard.
+  - Helpers _env_bool / _env_int car os.environ ne renvoie que des chaines.
+
+OBSTACLES / BUGS :
+  - [ENV] L'utilisateur etait dans cmd.exe (et non PowerShell) :
+    "Copy-Item" non reconnu. -> Solution : utiliser "copy .env.example .env".
+    A retenir : verifier l'invite (C:\...> = cmd, PS C:\...> = PowerShell).
+
+TESTS REALISES :
+  - Chargement avec fausse cle           -> OK (valeurs correctes, cle masquee)
+  - Chargement sans cle (validation)     -> OK (message clair + code sortie 1)
+  - Chargement avec la VRAIE cle .env    -> OK (cle 70 caracteres, masquee)
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 2 - api_client.py (couche transport NVIDIA NIM)
+----------------------------------------------------------------
+OBJECTIF :
+  Module dedie aux appels HTTP vers l'endpoint NVIDIA NIM.
+
+FICHIERS CREES :
+  - retroai_agent/api_client.py   (ApiClient + ApiError)
+
+DECISIONS TECHNIQUES :
+  - Responsabilite unique : transport pur. Aucune logique d'outils
+    ni de conversation ici (=> agent_loop.py).
+  - requests.Session reutilisee (connexion TCP gardee, + rapide sur vieux PC).
+  - Retry/backoff sur 429 via liste BACKOFF_DELAIS = [5, 10, 20]
+    (3 reessais => 4 tentatives max).
+  - Timeout requete = 120s.
+  - Mode "thinking" injecte via chat_template_kwargs SI config.enable_thinking.
+  - Cle "tools" ajoutee SEULEMENT si des outils existent (eviter tools:null/[]).
+  - Exception maison ApiError pour les echecs non recuperables.
+
+POINTS DE VIGILANCE (rappels cahier des charges) :
+  - Le piege rôle "tool" -> "user" sera gere dans agent_loop.py, PAS ici.
+
+TESTS REALISES :
+  - Construction ApiClient + payload (sans reseau)  -> OK
+  - VRAI appel API NVIDIA NIM ("dis bonjour")       -> OK (reponse recue,
+    176 tokens, modele kimi-k2.6 confirme fonctionnel).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 3 - safety.py (garde-fous)
+----------------------------------------------------------------
+OBJECTIF :
+  Centraliser les confirmations interactives et la detection des
+  commandes shell dangereuses. Securise par defaut.
+
+FICHIERS CREES :
+  - retroai_agent/safety.py
+
+DECISIONS TECHNIQUES :
+  - Le module AFFICHE et DEMANDE seulement, il n'execute jamais rien.
+  - demander_confirmation() : defaut = NON. True uniquement si y/o/yes/oui.
+    Entree seule = refus. Securise par defaut (cahier des charges).
+  - try/except EOFError/KeyboardInterrupt -> refus (jamais "fail open").
+  - detecter_danger() : regex sur motifs (rm -rf, mkfs, dd, fork bomb,
+    /dev/sdX, shutdown/reboot...) -> avertissement renforce, n'interdit pas.
+
+TESTS REALISES :
+  - detecter_danger sur 5 commandes  -> OK (dangereuses detectees, sures = None)
+  - confirmation sans terminal (EOF) -> OK (retourne False = refus)
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 4 - tools.py (les 4 outils)
+----------------------------------------------------------------
+OBJECTIF :
+  Definir les schemas JSON des 4 outils + leur implementation Python.
+
+FICHIERS CREES :
+  - retroai_agent/tools.py
+
+DECISIONS TECHNIQUES :
+  - TOOLS_SCHEMA : format OpenAI/JSON Schema envoye a l'API.
+  - Signature commune (args: dict, config: Config) -> str.
+  - Chaque outil retourne TOUJOURS une str (meme en erreur) : aucune
+    exception ne doit remonter et casser la boucle de l'agent.
+  - read_file : troncature a 50 000 caracteres, gestion binaire
+    (UnicodeDecodeError) et fichier introuvable.
+  - write_file / run_shell_command : confirmation obligatoire via safety.
+  - run_shell_command : detecter_danger + subprocess timeout = config.shell_timeout.
+  - Table de routage TOOLS + executer_outil() pour aiguiller depuis agent_loop.
+
+OBSTACLES / BUGS :
+  - [PLATEFORME] 1er test write_file vers /tmp/ a echoue : /tmp n'existe
+    pas sous Windows. Ce n'est PAS un bug code -> l'erreur a ete geree
+    proprement (message clair, pas de crash). Confirme que la gestion
+    d'erreur marche. A RETENIR : la cible finale est Linux Mint (/tmp ok),
+    mais pour tester sous Windows utiliser %TEMP%.
+
+TESTS REALISES :
+  - list_directory, read_file (ok / absent / inconnu)  -> OK
+  - write_file accepte (y) chemin valide               -> OK (fichier cree + relu)
+  - write_file refuse (n)                              -> OK (fichier NON cree)
+  - run_shell_command 'rm -rf' accepte (y)             -> OK (avertissement
+    danger affiche, sortie capturee, code retour 0)
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 5 - agent_loop.py (orchestration + piege NIM)
+----------------------------------------------------------------
+OBJECTIF :
+  Relier API + outils + historique. Gerer le tool calling et le piege
+  du role "tool" de NVIDIA NIM.
+
+FICHIERS CREES :
+  - retroai_agent/agent_loop.py
+
+DECISIONS TECHNIQUES :
+  - Classe AgentLoop : historique = liste de messages, reset() reinjecte
+    le message systeme (sert a la commande /reset).
+  - *** PIEGE NIM *** : resultat d'outil reinjecte en role "user" formate
+    "[Resultat de l'outil <nom>]\\n<resultat>". JAMAIS role "tool".
+  - _parser_arguments() : json.loads() sous try/except (arguments = chaine
+    JSON brute, possiblement malformee -> message d'erreur exploitable).
+  - Boucle bornee par MAX_ITERATIONS=10 (anti-boucle infinie).
+  - Le message assistant contenant les tool_calls est conserve dans
+    l'historique (point de vigilance si NIM le rejetait un jour).
+
+TESTS REALISES :
+  - VRAI appel : 'liste les fichiers + compte les .py' -> OK
+    * Roles historique = system/user/assistant/... AUCUN role 'tool' (PIEGE
+      DESAMORCE, confirme en reel).
+    * L'agent a tente run_shell_command -> confirmation refusee (EOF en test
+      pipe) -> il s'est ADAPTE avec list_directory -> bonne reponse (6 .py).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 6 - main.py (boucle CLI)
+----------------------------------------------------------------
+OBJECTIF :
+  Point d'entree + interface utilisateur (boucle interactive).
+
+FICHIERS CREES :
+  - retroai_agent/main.py
+
+DECISIONS TECHNIQUES :
+  - main() charge la config (gere SystemExit -> exit 1 si cle manquante).
+  - Commandes : /help, /reset (agent.reset()), /exit, /quit, /<inconnu>.
+  - Indicateur "L'agent reflechit..." (flush=True) avant l'appel API.
+  - ApiError attrapee dans la boucle -> message clair, la session continue.
+  - Ctrl+C / Ctrl+D (EOFError/KeyboardInterrupt) -> sortie propre.
+  - Lancement : python -m retroai_agent.main
+
+TESTS REALISES :
+  - Session pipe : /help, /reset, question reelle, /exit -> OK
+    (banniere, aide, reset, reponse 'Bonjour', sortie propre).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 7 - README.md + .gitignore (finalisation)
+----------------------------------------------------------------
+OBJECTIF :
+  Documenter le projet et proteger la cle API du versionnement.
+
+FICHIERS CREES :
+  - README.md     (installation, config, usage, architecture, securite)
+  - .gitignore    (ignore .env, __pycache__, venv, fichiers IDE)
+
+DECISIONS TECHNIQUES :
+  - .env explicitement ignore par git (jamais commit la cle).
+  - README documente le piege NIM (role tool -> user) et le tableau des
+    variables d'environnement.
+
+OBSTACLES / BUGS :
+  - [REDACTION] Un ``` superflu en fin de README -> corrige (Edit).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+================================================================
+ PROJET COMPLET - tous les modules ecrits, testes et valides.
+   Lancement : python -m retroai_agent.main
+================================================================
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 8 - Renommage BAZIZ.IA + profil utilisateur
+----------------------------------------------------------------
+OBJECTIF :
+  1) Renommer l'agent RetroAI -> BAZIZ.IA (persona, banniere, invite).
+  2) Au 1er lancement, proposer (avec consentement) de renseigner nom +
+     infos de base pour personnaliser l'experience.
+
+FICHIERS CREES :
+  - retroai_agent/profile.py   (consentement, collecte, stockage JSON)
+
+FICHIERS MODIFIES :
+  - retroai_agent/agent_loop.py  (SYSTEME -> "Tu es BAZIZ.IA" ;
+    __init__ accepte infos_utilisateur ; reset() les injecte au systeme)
+  - retroai_agent/main.py        (banniere/invite BAZIZ.IA ; appel
+    profile.initialiser_profil() au demarrage ; salut par prenom)
+  - .gitignore                   (ignore user_profile.json - donnees perso)
+
+DECISIONS TECHNIQUES :
+  - Consentement explicite, defaut = NON. Choix memorise (meme le refus,
+    stocke {"partage": false}) pour ne plus reposer la question.
+  - Profil 100% local (user_profile.json), jamais envoye, ignore par git.
+  - Toutes les questions du profil sont optionnelles (Entree = saute).
+  - Les infos sont injectees dans le message systeme via profil_en_texte(),
+    et conservees apres /reset (car reset() reconstruit avec infos).
+
+OBSTACLES / BUGS :
+  - [AFFICHAGE/Windows] En sortie "pipe" sous Windows, les accents du
+    modele s'affichent en "?" (console cp1252 vs UTF-8). PAS un bug code :
+    la cible finale est Linux Mint (UTF-8 par defaut, pas de souci).
+    Fix optionnel possible pour Windows si besoin (reconfigure stdout UTF-8).
+
+TESTS REALISES :
+  - 1er lancement + ACCEPTE (nom=Karim, role) -> salut par prenom +
+    reponse personnalisee ("ton prenom est Karim, developpeur Python")  OK
+  - 2e lancement -> aucune question, profil recharge, salut Karim         OK
+  - 1er lancement + REFUS -> {"partage": false} enregistre, pas de salut,
+    plus jamais redemande                                                 OK
+  - Profil de test supprime apres essais (vrai 1er lancement preserve).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 9 - Profil : pseudo au lieu du nom
+----------------------------------------------------------------
+OBJECTIF :
+  Demander un PSEUDO et non le vrai nom (demande utilisateur).
+
+FICHIERS MODIFIES :
+  - retroai_agent/profile.py  (question "Votre pseudo :", cle "pseudo",
+    profil_en_texte() et texte de consentement adaptes)
+  - retroai_agent/main.py     (salut base sur profil["pseudo"])
+
+OBSTACLES / BUGS :
+  - [DONNEES] Un user_profile.json existait deja (cree par l'utilisateur
+    lors d'un essai : nom=baziz, role=ingenieur info). Comme le profil
+    existait, la question n'etait plus posee -> 1er test fausse. Le fichier
+    a ete supprime (donnee de test) puis re-test propre effectue. A RETENIR :
+    l'ancien format utilisait la cle "nom" ; desormais c'est "pseudo".
+    Les anciens profils "nom" sont ignores sans erreur (lecture .get()).
+  - [AFFICHAGE] Une reponse de l'agent est revenue vide une fois (content
+    vide). A surveiller ; non bloquant.
+
+TESTS REALISES :
+  - 1er lancement ACCEPTE (pseudo=NeoByte) -> profil {"pseudo":"NeoByte",...}
+    + salut "Ravi de te retrouver, NeoByte !"                            OK
+  - Profil de test supprime (vrai 1er lancement preserve).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 10 - Interface graphique (rich, style Claude Code)
+----------------------------------------------------------------
+OBJECTIF :
+  Ameliorer l'interface terminal en s'inspirant de Claude Code :
+  banniere en panneau, reponses en Markdown, accent orange, lignes
+  d'outils stylees, spinner de reflexion, panneaux de confirmation.
+
+FICHIERS CREES :
+  - retroai_agent/ui.py   (couche d'affichage centralisee + repli sans rich)
+
+FICHIERS MODIFIES :
+  - safety.py     -> confirmation via ui.panneau_confirmation / lire_oui_non
+                     (+ parametre dangereux pour panneau rouge)
+  - tools.py      -> ui.action_outil(...) au lieu de print ; passe dangereux
+  - agent_loop.py -> appel API entoure de ui.reflexion() (spinner)
+  - main.py       -> banniere/aide/saisie/reponse/erreurs via ui
+  - requirements.txt -> rich active (>=13.0.0)
+
+DECISIONS TECHNIQUES :
+  - ui.py utilise rich SI dispo, sinon repli texte simple (RICH_DISPO).
+    Le projet reste 100% fonctionnel sans rich (cible = vieux PC).
+  - Palette inspiree Claude Code : accent orange #D97757, danger rouge.
+  - Reponses agent rendues en Markdown (Markdown de rich).
+  - Spinner place autour de l'appel reseau SEUL dans agent_loop (jamais
+    autour d'un input(), sinon conflit avec le mode Live de rich).
+  - Force stdout/stderr en UTF-8 a l'import de ui (corrige Windows cp1252).
+
+OBSTACLES / BUGS :
+  - [BUG Windows] 1er essai : crash UnicodeEncodeError sur '✻' (cp1252).
+    CAUSE : rich ecrit des glyphes Unicode dans une console Windows cp1252.
+    FIX : sys.stdout/stderr.reconfigure(encoding='utf-8') au chargement de
+    ui.py. Corrige aussi l'ancien souci d'affichage des accents. Sans effet
+    sous Linux (deja UTF-8). -> RESOLU et re-teste OK.
+
+TESTS REALISES :
+  - Session pipe avec rich : banniere panneau, reponse Markdown (code +
+    puces), accents OK, /help en panneau                              OK
+  - Panneaux de confirmation rich : normal (orange) + dangereux (rouge
+    "ACTION DANGEREUSE")                                              OK
+  - Repli force RICH_DISPO=False : affichage texte simple, aucun crash OK
+  - rich 15.0.0 installe.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 11 - UX : rythme vertical + resultats d'outils ⎿
+----------------------------------------------------------------
+OBJECTIF :
+  Affiner l'UI/UX facon Claude Code : meilleure respiration entre les
+  blocs, et affichage du resultat des outils sous la ligne ⏺ avec ⎿.
+
+FICHIERS MODIFIES :
+  - ui.py        : action_outil() via objet Text (robuste aux crochets) +
+                   ligne vide avant ; nouveau resultat_outil() (apercu ⎿,
+                   tronque a 4 lignes, markup=False pour ne rien casser) ;
+                   reponse_agent() avec lignes vides avant/apres (separation
+                   nette des tours de parole).
+  - agent_loop.py: appel ui.resultat_outil(resultat) apres chaque outil.
+
+DECISIONS TECHNIQUES :
+  - resultat_outil utilise markup=False / highlight=False : le contenu
+    (fichiers, sorties shell) ne doit pas etre interprete comme du balisage.
+  - Apercu limite a 4 lignes + compteur "(+N lignes)" pour rester lisible.
+
+OBSTACLES / BUGS :
+  - [DONNEES] Un user_profile.json (refus precedent de l'utilisateur)
+    existait encore -> le 'n' du test est parti comme message. NON bloquant.
+  - [PROCESS] DECISION : ne plus supprimer user_profile.json pendant les
+    tests (ca effacait les preferences de l'utilisateur a chaque essai).
+    Tests futurs : ne pas toucher au profil reel.
+
+TESTS REALISES :
+  - Session pipe : ⏺ list_directory + ⎿ apercu tronque "(+7 lignes)" +
+    reponse Markdown avec puces + espacements entre tours              OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 12 - UI agrandie (gros logo + panneaux pleine largeur)
+----------------------------------------------------------------
+OBJECTIF :
+  "Agrandir le tout" : grand logo ASCII BAZIZ.IA, panneaux pleine
+  largeur, marges interieures accrues.
+
+FICHIERS MODIFIES :
+  - ui.py : constante LOGO (ASCII genere par script pour alignement fixe) ;
+    banniere() -> logo centre + expand=True + padding (2,4) + lignes vides ;
+    aide() et panneau_confirmation() -> expand=True + padding (1,4).
+
+DECISIONS TECHNIQUES :
+  - Logo ASCII genere via un dict de glyphes (5 lignes) pour garantir
+    l'alignement des colonnes (evite les erreurs d'alignement manuel).
+  - expand=True : les panneaux occupent toute la largeur du terminal.
+  - En terminal, "agrandir" = plus de largeur/marges + grand logo
+    (la taille de police est geree par le terminal, pas par le programme).
+
+OBSTACLES / BUGS :
+  - [ENCODAGE] Le script de generation du logo plantait en cp1252 ->
+    relance avec PYTHONUTF8=1. Rappel recurrent : Windows = cp1252 par
+    defaut ; le projet force deja UTF-8 dans ui.py (sans effet sous Linux).
+
+TESTS REALISES :
+  - banniere + aide a COLUMNS=90 : grand logo centre lisible "BAZIZ.IA",
+    panneaux pleine largeur, marges OK                                  OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 13 - Changement de palette (orange -> rouge)
+----------------------------------------------------------------
+OBJECTIF :
+  Passer la couleur d'accent de l'orange au rouge (demande utilisateur).
+
+FICHIERS MODIFIES :
+  - ui.py : ACCENT #D97757 -> #E03131 (rouge). DANGER assombri
+    #E5484D -> #9B1C1C pour rester distinct de l'accent desormais rouge.
+
+DECISIONS TECHNIQUES :
+  - Une seule constante a changer (ACCENT) : tout le projet l'utilise.
+    Illustre l'interet d'avoir centralise la palette dans ui.py.
+
+TESTS REALISES :
+  - banniere : rendu sans erreur, structure intacte (couleur visible en
+    vrai terminal).                                                     OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 14 - Zone de saisie encadree (au lieu d'une fleche)
+----------------------------------------------------------------
+OBJECTIF :
+  Remplacer la simple fleche "›" par une zone de saisie encadree
+  facon Claude Code.
+
+FICHIERS MODIFIES :
+  - ui.py : lire_saisie() dessine un cadre (haut "╭─ Vous ─╮", invite
+    "│ ›", bas "╰─╯") sur la largeur du terminal. try/finally pour
+    toujours refermer le cadre (meme sur Ctrl+C).
+
+DECISIONS TECHNIQUES :
+  - Largeur calculee via _console.size.width (defaut 80 si non-tty).
+  - Cadre haut + bas + bordure gauche seulement : input() ne permet pas
+    de fermer la boite a droite (texte de longueur variable, curseur non
+    controle). Une vraie boite 4 cotes exigerait prompt_toolkit (lourd) ->
+    ecarte pour rester leger (cible vieux PC).
+
+OBSTACLES / BUGS :
+  - [TEST] En mode pipe (stdin non-tty), pas d'echo ni de saut de ligne
+    apres input -> la bordure basse parait collee a "│ ›". Artefact de
+    test uniquement : en terminal interactif, Entree descend d'une ligne
+    et le rendu est correct. NON bloquant.
+
+TESTS REALISES :
+  - Affichage du cadre haut/bas pleine largeur sans erreur.            OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Profil "pseudo" (et non le vrai nom)
+----------------------------------------------------------------
+OBJECTIF :
+  Profil : demander un PSEUDO (et non le vrai nom).
+
+FICHIERS MODIFIES :
+  - profile.py : champ "nom" -> "pseudo" (question, cle JSON, texte systeme,
+    message de consentement).
+  - main.py    : boucle_cli(..., pseudo=profil.get("pseudo")).
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Centrage barre de saisie : TENTE PUIS ANNULE
+----------------------------------------------------------------
+OBJECTIF (annule) :
+  Centrer horizontalement l'encadre "Vous" (largeur reduite + marge).
+
+OBSTACLE / BUG :
+  - Le centrage (marge gauche + cadre 60%) empechait le BAS du cadre
+    "╰─╯" de s'afficher correctement. Sur demande utilisateur : REVERT.
+
+ACTION :
+  - ui.py / lire_saisie() remis a l'identique (cadre pleine largeur).
+
+ETAT : ANNULE (retour a la version pleine largeur qui fonctionne).
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Cadre de saisie : invite en coin "╰─›"
+----------------------------------------------------------------
+OBJECTIF :
+  Le bas du cadre "╰─╯" ne s'affichait jamais pendant la frappe (capture
+  cmd reduite). Cause : impossible de dessiner une ligne SOUS le curseur
+  avec input() ; la ligne basse ne s'imprime qu'apres Entree -> boite
+  qui parait "ouverte".
+
+DECISION TECHNIQUE :
+  - Une vraie boite 4 cotes en permanence exigerait un TUI (prompt_toolkit)
+    -> ecarte (legerete, cible vieux PC).
+  - A la place : invite = coin bas-gauche "╰─›". Le cadre parait ferme et
+    soigne sans ligne sous le curseur. Plus de try/finally (inutile).
+
+  Rendu :
+    ╭─ Vous ───────────────────────╮
+    ╰─› texte...
+
+FICHIERS MODIFIES :
+  - ui.py / lire_saisie() (RICH_DISPO).
+
+ETAT : TERMINEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Haut du cadre sans coin + grand "AU REVOIR"
+----------------------------------------------------------------
+OBJECTIF :
+  1) Retirer le coin "╮" en haut a droite du cadre de saisie -> finir
+     par des "──" (largeur - 8 au lieu de largeur - 9 + ╮).
+  2) Sur Ctrl+C / fin d'entree : afficher un grand "AU REVOIR" en
+     gros caracteres pixelises (meme esprit que le LOGO).
+
+FICHIERS MODIFIES :
+  - ui.py : haut du cadre sans ╮ ; ajout _FONT_ADIEU (police pixel 5x5),
+    _texte_pixel() et au_revoir() (Text rouge centre si rich).
+  - main.py : boucle_cli -> ui.au_revoir() au lieu de ui.info('Au revoir')
+    dans le except (EOFError, KeyboardInterrupt).
+
+TESTS REALISES :
+  - Rendu _texte_pixel('AU REVOIR')           -> OK (lisible, 5 lignes).
+  - Fin d'entree (meme branche que Ctrl+C)    -> OK (grand AU REVOIR affiche).
+
+CORRECTIF :
+  - justify='center' de rich peu fiable -> centrage MANUEL : marge =
+    (largeur_ecran - largeur_bloc)//2 prependee a chaque ligne.
+    Verifie : ecran 120 -> bloc 54, marges 33/33.
+
+ETAT : TERMINEE ET VALIDEE.

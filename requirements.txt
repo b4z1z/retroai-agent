@@ -1,0 +1,7 @@
+# Dependance principale : appels HTTP vers l'API NVIDIA NIM.
+requests>=2.31.0
+
+# Mise en forme du terminal (couleurs, panneaux, markdown).
+# Optionnel au sens strict : le projet bascule en affichage texte simple
+# si rich est absent (voir ui.py). Recommande pour l'interface soignee.
+rich>=13.0.0

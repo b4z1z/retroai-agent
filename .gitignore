@@ -1,0 +1,21 @@
+# Secrets : NE JAMAIS commit le fichier .env (contient la cle API).
+.env
+
+# Donnees personnelles : profil utilisateur local.
+user_profile.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Outils / IDE
+.vscode/
+.idea/
+*.swp
+
+# Journal local (optionnel : retirez cette ligne pour le versionner)
+# JOURNAL.txt
