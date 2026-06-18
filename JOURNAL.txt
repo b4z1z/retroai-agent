@@ -995,3 +995,19 @@ RAPPEL : baziz.ia lit .env dans le dossier courant -> lancer depuis le
   dossier du projet.
 
 ETAT : TERMINEE (a pousser).
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - README : section Prerequis (outils a avoir)
+----------------------------------------------------------------
+OBJECTIF :
+  Documenter les outils requis (curl, git, python3) avec "comment
+  verifier / comment installer si ca ne marche pas", par OS.
+
+FICHIERS MODIFIES :
+  - README.md : nouvelle section "Prerequis (outils a avoir)" avec
+    tableaux Linux/macOS et Windows (verifier via --version, installer
+    via apt / liens officiels), + notes de depannage (command not found,
+    PATH a recharger, option "Add to PATH" sous Windows).
+
+ETAT : TERMINEE (a pousser).

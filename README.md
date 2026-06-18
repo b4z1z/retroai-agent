@@ -24,9 +24,40 @@ l'utilisateur**.
 
 ---
 
-## Installation
+## Prérequis (outils à avoir)
 
-> **Prérequis** : `git` et Python 3.8+ installés.
+Avant d'installer, il te faut quelques outils de base. **Vérifie** chacun avec
+`--version` ; **installe** seulement ceux qui manquent.
+
+### Linux / macOS
+
+| Outil | Vérifier | Installer s'il manque |
+|---|---|---|
+| **curl** (pour le one-liner) | `curl --version` | `sudo apt install curl` |
+| **git** | `git --version` | `sudo apt install git` |
+| **Python 3.8+** | `python3 --version` | `sudo apt install python3` |
+
+> 💡 `git` et `python3` sont aussi installés **automatiquement** par le script
+> d'installation rapide. En pratique, sur Linux Mint, seul **`curl`** doit être
+> présent au départ. Si une commande répond *« command not found »*, installe
+> l'outil correspondant avec la commande de droite.
+
+### Windows
+
+| Outil | Vérifier (PowerShell) | Installer s'il manque |
+|---|---|---|
+| **Git** | `git --version` | [git-scm.com/download/win](https://git-scm.com/download/win) |
+| **Python 3.8+** | `python --version` | [python.org/downloads](https://www.python.org/downloads/) — ⚠️ cocher **« Add Python to PATH »** à l'installation |
+| **curl / irm** | `irm --help` | déjà inclus dans Windows 10/11 |
+
+> ⚠️ Si `python` ou `git` répond *« n'est pas reconnu… »* après installation,
+> **ferme et rouvre** ton terminal (le PATH doit être rechargé). Si ça persiste,
+> c'est que l'option *« Add to PATH »* n'a pas été cochée → réinstalle en la
+> cochant.
+
+---
+
+## Installation
 
 ### ⚡ Installation rapide (une ligne)
 
