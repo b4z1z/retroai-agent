@@ -22,11 +22,16 @@ PIEGE des arguments :
 from __future__ import annotations
 
 import json
+import os
 
 from .api_client import ApiClient, ApiError
 from .config import Config
 from . import tools
 from . import ui
+
+
+# Fichier local de sauvegarde de la conversation (pour /continue).
+CHEMIN_SESSION = "session_history.json"
 
 
 # Message systeme : definit le role et le comportement de l'agent.
@@ -56,6 +61,9 @@ class AgentLoop:
         # message systeme pour personnaliser les reponses. Peut etre vide.
         self.infos_utilisateur = infos_utilisateur
         self.historique: list[dict] = []
+        # Vrai si le dernier tour a ete interrompu (echec API) et reste a
+        # reprendre. Permet a /continue de relancer la ou ca s'est arrete.
+        self.tour_incomplet = False
         self.reset()
 
     def reset(self) -> None:
@@ -64,6 +72,7 @@ class AgentLoop:
         if self.infos_utilisateur:
             contenu = SYSTEME + "\n\n" + self.infos_utilisateur
         self.historique = [{"role": "system", "content": contenu}]
+        self.tour_incomplet = False
 
     # ------------------------------------------------------------------ #
     #  Parsing robuste des arguments d'un tool call                      #
@@ -83,19 +92,101 @@ class AgentLoop:
         return donnees
 
     # ------------------------------------------------------------------ #
+    #  Persistance de la conversation (commande /continue)               #
+    # ------------------------------------------------------------------ #
+    def sauver_session(self, chemin: str = CHEMIN_SESSION) -> None:
+        """Enregistre l'historique sur disque (echec silencieux si impossible)."""
+        try:
+            with open(chemin, "w", encoding="utf-8") as f:
+                json.dump(self.historique, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+
+    def charger_session(self, chemin: str = CHEMIN_SESSION) -> bool:
+        """
+        Recharge un historique sauvegarde. Retourne True si une session
+        valide a ete restauree, False sinon.
+        """
+        if not os.path.exists(chemin):
+            return False
+        try:
+            with open(chemin, "r", encoding="utf-8") as f:
+                donnees = json.load(f)
+        except (OSError, ValueError):
+            return False
+        if isinstance(donnees, list) and donnees:
+            self.historique = donnees
+            return True
+        return False
+
+    # ------------------------------------------------------------------ #
+    #  Appel API avec un reessai automatique (timeout / erreur reseau)   #
+    # ------------------------------------------------------------------ #
+    def _appel_api(self) -> dict:
+        """
+        Appelle l'API en reessayant UNE fois en cas d'ApiError (timeout,
+        coupure reseau...). Si le 2e essai echoue aussi, l'ApiError remonte.
+        """
+        derniere_erreur: ApiError | None = None
+        for tentative in range(2):  # 1 essai + 1 reessai
+            try:
+                with ui.reflexion():
+                    return self.client.chat(
+                        self.historique, tools=tools.TOOLS_SCHEMA
+                    )
+            except ApiError as exc:
+                derniere_erreur = exc
+                if tentative == 0:
+                    ui.info("Echec/timeout — nouvelle tentative automatique…")
+        # Les deux tentatives ont echoue.
+        raise derniere_erreur  # type: ignore[misc]
+
+    # ------------------------------------------------------------------ #
     #  Traitement d'un tour de parole utilisateur                        #
     # ------------------------------------------------------------------ #
     def envoyer(self, message_utilisateur: str) -> str:
         """
-        Ajoute le message de l'utilisateur, dialogue avec l'API en boucle
-        tant que le modele demande des outils, et retourne la reponse
-        textuelle finale de l'agent.
+        Ajoute le message de l'utilisateur puis traite le tour complet
+        (appels API + outils) et retourne la reponse finale de l'agent.
         """
         self.historique.append({"role": "user", "content": message_utilisateur})
+        return self._executer_tour()
 
+    def reprendre(self) -> str:
+        """
+        Reprend un tour INTERROMPU sans ajouter de nouveau message.
+        Le modele continue a partir des derniers resultats d'outils deja
+        obtenus : toute la progression precedente est conservee.
+        """
+        return self._executer_tour()
+
+    def _executer_tour(self) -> str:
+        """
+        Execute la boucle de dialogue avec gestion d'echec NON destructive.
+
+        IMPORTANT : en cas d'echec API (apres le reessai auto de _appel_api),
+        on NE supprime RIEN de l'historique. Toute la reflexion deja faite
+        (resultats d'outils, etapes intermediaires) est conservee ET
+        sauvegardee, pour pouvoir reprendre plus tard avec /continue sans
+        repartir de zero.
+        """
+        try:
+            reponse_finale = self._dialoguer()
+        except ApiError:
+            # Echec : on marque le tour comme incomplet et on PRESERVE tout.
+            self.tour_incomplet = True
+            self.sauver_session()
+            raise
+
+        # Succes : tour termine, on sauvegarde l'etat complet.
+        self.tour_incomplet = False
+        self.sauver_session()
+        return reponse_finale
+
+    def _dialoguer(self) -> str:
+        """Boucle de dialogue : appels API + execution d'outils."""
         for _ in range(MAX_ITERATIONS):
-            with ui.reflexion():
-                reponse = self.client.chat(self.historique, tools=tools.TOOLS_SCHEMA)
+            reponse = self._appel_api()
 
             try:
                 message = reponse["choices"][0]["message"]

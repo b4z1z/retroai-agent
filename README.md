@@ -68,17 +68,65 @@ dans `.env` (ignoré par git) ou dans une variable d'environnement.
 python -m retroai_agent.main
 ```
 
+### Raccourci : la commande `baziz.ia`
+
+Pour lancer l'agent en tapant simplement **`baziz.ia`** (au lieu de la
+commande complète), installez le projet en mode éditable **une seule fois** :
+
+```bash
+cd retroai-agent
+pip install -e .
+```
+
+Ensuite, depuis le dossier du projet :
+
+```bash
+baziz.ia
+```
+
+> ⚠️ **À savoir** : l'agent lit `.env`, `user_profile.json`,
+> `session_history.json` et `COMMANDES.txt` dans le **dossier courant**.
+> Lancez donc `baziz.ia` **depuis le dossier du projet** (ou définissez
+> `NVIDIA_API_KEY` comme variable d'environnement système). Si la commande
+> n'est pas reconnue, ouvrez un **nouveau terminal** (le PATH doit être
+> rechargé après l'installation).
+
 Commandes de l'interface :
 
-| Commande         | Effet                                  |
-|------------------|----------------------------------------|
-| `/help`          | Affiche l'aide.                        |
-| `/reset`         | Vide l'historique de conversation.     |
-| `/exit`, `/quit` | Quitte proprement.                     |
+| Commande         | Effet                                                        |
+|------------------|--------------------------------------------------------------|
+| `/help`          | Affiche l'aide (liste des commandes).                        |
+| `/continue`      | Reprend une tâche interrompue ou la session précédente.      |
+| `/reset`         | Vide l'historique de conversation.                           |
+| `/exit`, `/quit` | Quitte proprement.                                           |
+
+Astuces :
+- Tapez **`/`** (ou `/?`) pour afficher la liste des commandes à tout moment.
+- Une commande partielle propose des **suggestions** (ex. `/c` → `/continue`).
+- Un fichier **`COMMANDES.txt`** est généré à la racine à chaque lancement
+  (mémo de toutes les commandes, façon `help`).
 
 Tapez n'importe quel autre texte pour dialoguer avec l'agent. Lorsqu'il propose
-une écriture de fichier ou une commande shell, il vous demande **`[y/N]`** :
+une écriture de fichier ou une commande shell, il demande **`Confirmer ? (y/n)`** :
 seul `y` (ou `o`) valide ; tout le reste annule.
+
+### Profil utilisateur (optionnel)
+
+Au **tout premier lancement**, l'agent propose de renseigner un **pseudo** et
+quelques infos pour personnaliser l'expérience (avec votre accord). Ce choix
+est mémorisé dans `user_profile.json` (local, ignoré par git) et **n'est plus
+redemandé** ensuite. Pour que la question soit reposée, supprimez ce fichier :
+
+```bash
+rm user_profile.json        # Windows (cmd) : del user_profile.json
+```
+
+### Reprise après une erreur / un timeout
+
+Si l'API échoue (timeout, coupure réseau…), l'agent **réessaie une fois**
+automatiquement. Si l'échec persiste **en pleine tâche**, la progression
+n'est **pas perdue** : tapez **`/continue`** pour reprendre là où ça s'est
+arrêté (la conversation est sauvegardée dans `session_history.json`).
 
 ---
 
@@ -88,9 +136,13 @@ seul `y` (ou `o`) valide ; tout le reste annule.
 retroai-agent/
  ├── README.md
  ├── requirements.txt
+ ├── pyproject.toml       # packaging + commande "baziz.ia"
  ├── .env.example         # modèle de configuration
  ├── .gitignore
  ├── JOURNAL.txt          # journal de bord (étapes, bugs, décisions)
+ ├── COMMANDES.txt        # (généré) mémo des commandes, façon "help"
+ ├── user_profile.json    # (généré, local) pseudo + préférences
+ ├── session_history.json # (généré, local) conversation pour /continue
  └── retroai_agent/
      ├── __init__.py
      ├── main.py          # point d'entrée + boucle CLI
@@ -128,7 +180,7 @@ main.py  ──saisie──>  agent_loop.py  ──requête──>  api_client.p
 
 - La clé API n'est **jamais** écrite en dur ; lue via `config.py`.
 - Comportement **ultra-sécurisé par défaut** : aucune écriture ni commande
-  shell sans confirmation explicite (`y/N`, défaut = non).
+  shell sans confirmation explicite (`Confirmer ? (y/n)`, défaut = non).
 - Détection de commandes dangereuses (`rm -rf`, `mkfs`, `dd`, fork bomb…) avec
   avertissement renforcé.
 - En cas d'entrée coupée, la réponse par défaut est **le refus**.

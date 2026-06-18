@@ -1,0 +1,13 @@
+============================================================
+  BAZIZ.IA - Liste des commandes de l'interface
+============================================================
+
+Tapez l'une de ces commandes a l'invite, ou '/' pour afficher
+cette liste directement dans le terminal.
+
+  /help          Affiche cette aide
+  /continue      Reprend une tache interrompue / la session precedente
+  /reset         Vide l'historique de la conversation
+  /exit, /quit   Quitte le programme
+
+Tout autre texte saisi est envoye comme message a l'agent.

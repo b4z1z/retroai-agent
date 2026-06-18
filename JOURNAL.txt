@@ -455,6 +455,67 @@ ETAT : TERMINEE ET VALIDEE.
 
 
 ----------------------------------------------------------------
+[2026-06-18] ETAPE 15 - Confirmation : format "(y/n)"
+----------------------------------------------------------------
+OBJECTIF :
+  Afficher l'indication "(y/n)" apres "Confirmer ?" (demande user).
+
+NOTE : aller-retour. D'abord retire par erreur (mauvaise comprehension),
+  puis remis au format "(y/n)" demande par l'utilisateur.
+
+FICHIERS MODIFIES :
+  - ui.py : lire_oui_non() -> invite "Confirmer ? (y/n)".
+
+DECISIONS TECHNIQUES :
+  - Seul l'affichage change ; la LOGIQUE de securite reste identique
+    (seul y/o/yes/oui accepte, tout le reste refuse).
+
+TESTS REALISES :
+  - Panneau de confirmation : "Confirmer ? (y/n)" + "→ Accepte."       OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE 16 - Robustesse timeout + persistance (/continue)
+----------------------------------------------------------------
+OBJECTIF :
+  1) Reessai automatique (1x) en cas de timeout/erreur API.
+  2) Nettoyer l'historique si un tour echoue (pas de doublon au retry).
+  3) Persistance de la conversation + commande /continue pour reprendre
+     la ou on s'est arrete (eviter de perdre le contexte/tokens).
+
+FICHIERS MODIFIES :
+  - agent_loop.py :
+    * CHEMIN_SESSION = "session_history.json".
+    * sauver_session() / charger_session() (JSON).
+    * _appel_api() : 1 essai + 1 reessai auto sur ApiError.
+    * envoyer() : point_de_reprise (snapshot) ; en cas d'ApiError ->
+      del historique[point_de_reprise:] (restauration) puis l'erreur
+      remonte ; en cas de succes -> sauver_session().
+    * boucle de dialogue extraite dans _dialoguer().
+  - main.py : commande /continue -> agent.charger_session().
+  - ui.py   : /continue ajoute a l'aide.
+  - .gitignore : session_history.json (contient la conversation).
+
+DECISIONS TECHNIQUES :
+  - Sauvegarde apres CHAQUE tour reussi : on peut reprendre meme apres
+    fermeture du programme.
+  - Reponse a la question utilisateur : un timeout NE force PAS a tout
+    recommencer ; l'historique est conserve (et desormais sauvegarde).
+
+TESTS REALISES :
+  - Run1 (conversation "retiens LICORNE42") -> session_history.json (3 msg) OK
+  - Run2 (/continue puis "quel mot ?") -> agent repond LICORNE42 (contexte
+    restaure d'un lancement a l'autre)                                   OK
+  - Simulation timeout (faux chat) : 2 appels (essai+reessai), historique
+    restaure a son etat initial, ApiError remontee                      OK
+  - session_history.json de test supprime apres essais.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
 [2026-06-18] ETAPE - Profil "pseudo" (et non le vrai nom)
 ----------------------------------------------------------------
 OBJECTIF :
@@ -532,5 +593,249 @@ CORRECTIF :
   - justify='center' de rich peu fiable -> centrage MANUEL : marge =
     (largeur_ecran - largeur_bloc)//2 prependee a chaque ligne.
     Verifie : ecran 120 -> bloc 54, marges 33/33.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Echec API : CONSERVER la progression (correction)
+----------------------------------------------------------------
+CONTEXTE / MALENTENDU :
+  L'etape precedente (robustesse timeout) SUPPRIMAIT tout le tour en cas
+  d'echec (del historique[point_de_reprise:]). L'utilisateur a precise son
+  vrai besoin : si l'API plante en PLEIN milieu d'une longue tache (ex.
+  etape 8/10), il ne veut PAS perdre toute la reflexion deja faite.
+
+OBJECTIF :
+  En cas d'echec API, NE RIEN supprimer : conserver tous les resultats
+  d'outils / etapes deja obtenus, et pouvoir reprendre la ou ca s'est
+  arrete (sans tout refaire).
+
+FICHIERS MODIFIES :
+  - agent_loop.py :
+    * SUPPRESSION de la logique destructrice (plus de del historique[...]).
+    * Nouveau flag self.tour_incomplet (True si dernier tour interrompu).
+    * envoyer() = append message + _executer_tour().
+    * reprendre() = _executer_tour() SANS nouveau message (le modele
+      continue a partir des derniers resultats d'outils).
+    * _executer_tour() : en cas d'ApiError -> tour_incomplet=True +
+      sauver_session() + raise (progression PRESERVEE). Succes ->
+      tour_incomplet=False + sauver_session().
+  - main.py :
+    * helper _traiter_reponse(agent, saisie/reprise) : gere envoyer OU
+      reprendre, et sur ApiError affiche "Progression conservee. Tape
+      /continue pour reprendre".
+    * /continue : si tour_incomplet -> reprendre() ; sinon recharge le
+      disque, et si la session rechargee est incomplete (dernier role=user)
+      -> reprise auto.
+  - ui.py : libelle d'aide /continue mis a jour.
+
+TESTS REALISES :
+  - Simulation : outil execute (progression) puis timeout a l'etape
+    suivante -> tour_incomplet=True, 4 messages CONSERVES (resultat
+    d'outil garde), roles [system,user,assistant,user].               OK
+  - reprendre() ensuite -> PAS de re-execution de l'outil, reponse
+    finale obtenue, tour_incomplet=False, 5 messages.                 OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Commandes : "/" affiche la liste + COMMANDES.txt
+----------------------------------------------------------------
+OBJECTIF :
+  1) Taper "/" (ou "/?" ou une commande inconnue) affiche la liste des
+     commandes dans le terminal.
+  2) Generer un fichier COMMANDES.txt documentant toutes les commandes
+     (facon 'help' de cmd).
+
+FICHIERS MODIFIES :
+  - ui.py :
+    * COMMANDES = source UNIQUE (liste (cmd, description)).
+    * aide() utilise COMMANDES.
+    * exporter_commandes(chemin="COMMANDES.txt") : ecrit le fichier depuis
+      COMMANDES (reste toujours a jour).
+  - main.py :
+    * "/" et "/?" -> ui.aide().
+    * commande inconnue -> ui.erreur(...) + ui.aide() (montre les options).
+    * main() appelle ui.exporter_commandes() au demarrage.
+  - COMMANDES.txt : genere a la racine.
+
+DECISIONS TECHNIQUES :
+  - Source unique COMMANDES : aide ecran + fichier txt + handler "/" tirent
+    de la meme liste -> pas de divergence (DRY).
+  - Fichier regenere a chaque lancement : jamais obsolete.
+
+TESTS REALISES :
+  - "/" en session -> panneau "Commandes disponibles" affiche.        OK
+  - COMMANDES.txt genere, contenu complet et correct.                 OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Suggestions de commandes + doc README
+----------------------------------------------------------------
+OBJECTIF :
+  1) Suggestions apres "/" (ex. "/c" -> propose /continue).
+  2) Documenter dans le README : commandes, profil, /continue, reprise
+     apres erreur, suggestions, COMMANDES.txt.
+
+FICHIERS MODIFIES :
+  - ui.py : NOMS_COMMANDES (liste plate depuis COMMANDES) ;
+    commandes_correspondantes(prefixe) ; suggestions(prefixe).
+  - main.py : commande non reconnue -> si prefixe correspond a des
+    commandes, afficher suggestions ; sinon erreur + aide complete.
+  - README.md : tableau des commandes complete (/continue), section
+    Profil utilisateur, section Reprise apres erreur/timeout, astuces
+    ("/", suggestions, COMMANDES.txt), note securite "(y/n)", arbo
+    avec fichiers generes.
+
+DECISIONS TECHNIQUES :
+  - Suggestions = correspondance par PREFIXE (leger, fiable, multiplateforme).
+  - Auto-completion "live" par Tab non incluse : necessite readline (stdlib
+    sur Linux/cible, absent par defaut sous Windows). Proposable en option.
+
+TESTS REALISES :
+  - "/c" -> "Suggestions : /continue" ; "/re" -> "/reset" ;
+    "/xyz" -> inconnue + liste complete.                              OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Auto-completion LIVE des commandes (prompt_toolkit)
+----------------------------------------------------------------
+OBJECTIF :
+  Suggestions de commandes EN DIRECT (pendant la frappe de "/"), a la
+  fois sous Windows (cmd) ET Linux. -> bibliotheque prompt_toolkit.
+
+FICHIERS MODIFIES :
+  - requirements.txt : ajout prompt_toolkit>=3.0.0 (optionnel).
+  - ui.py :
+    * import prompt_toolkit (PTK_DISPO) avec repli si absent.
+    * _CommandeCompleter (Completer) : propose NOMS_COMMANDES des que la
+      saisie commence par "/".
+    * _obtenir_session() : creation PARESSEUSE de PromptSession (la creer
+      a l'import plante hors console reelle -> NoConsoleScreenBufferError).
+    * lire_saisie() : Mode1 ptk (si TTY) avec completion live -> Mode2 rich
+      -> Mode3 input(). Repli si ptk echoue (sauf EOF/KeyboardInterrupt).
+    * banniere() : ajout de /continue (manquait).
+  - prompt_toolkit installe (3.0.52).
+
+OBSTACLES / BUGS :
+  - [BUG] PromptSession() cree a l'import -> NoConsoleScreenBufferError
+    hors vraie console (terminal de test). FIX : creation paresseuse +
+    try/except (repli). Import et mode pipe OK ensuite.
+
+DECISIONS TECHNIQUES :
+  - prompt_toolkit = multiplateforme (Windows + Linux), contrairement a
+    readline (Linux seul). Repond a la demande "Linux ET cmd Windows".
+  - Completion live active uniquement en vrai TTY (sys.stdin.isatty()) ;
+    en pipe/non-tty -> repli sans completion (pas de blocage des tests).
+
+TESTS REALISES :
+  - Import + NOMS_COMMANDES + repli pipe (pas de crash)              OK
+  - Banniere/aide affichent /continue                               OK
+  - NOTE : la completion LIVE n'est pas testable hors vrai terminal.
+  - CONFIRME PAR L'UTILISATEUR : taper "/" affiche bien le menu des
+    commandes en direct dans son terminal.                            OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Fix layout completion en petite fenetre
+----------------------------------------------------------------
+CONTEXTE :
+  L'utilisateur constate : en PLEIN ECRAN la completion s'affiche bien,
+  mais en FENETRE REDUITE l'affichage est decale / grand vide (capture).
+
+CAUSE :
+  prompt_toolkit reserve par defaut 8 lignes sous le curseur pour le menu
+  de completion (reserve_space_for_menu=8). En petite fenetre ce vide est
+  tres visible. De plus, le cadre etait imprime par rich SEPAREMENT du
+  prompt ptk -> mauvaise coordination de l'affichage.
+
+CORRECTIF (ui.py / lire_saisie) :
+  - Cadre "╭─ Vous ─" integre DANS le message du prompt ptk (HTML multi-
+    ligne) au lieu d'un print rich separe -> ptk gere tout le bloc.
+  - reserve_space_for_menu=4 (au lieu de 8) : moins de vide.
+  - complete_style=CompleteStyle.MULTI_COLUMN : menu compact (grille).
+  - Modes 2/3 (rich/input) inchanges : impriment le cadre puis lisent.
+
+TESTS REALISES :
+  - Import OK (CompleteStyle dispo) + repli pipe sans crash.          OK
+  - NOTE : rendu en petite fenetre a CONFIRMER par l'utilisateur (non
+    testable hors vrai terminal).
+
+ETAT : ANNULEE (revert demande par l'utilisateur).
+
+ANNULATION :
+  L'utilisateur n'a vu aucune difference -> demande de revenir a l'etat
+  d'avant. Reverts effectues :
+  - import CompleteStyle retire.
+  - lire_saisie() : retour a la version precedente (cadre imprime par rich
+    AVANT le prompt ptk ; prompt ptk = HTML "╰─› " seul ; pas de
+    reserve_space_for_menu ni de complete_style).
+  Verifie : import OK, CompleteStyle absent, repli pipe OK.
+  -> Le vrai probleme en petite fenetre reste a diagnostiquer (a voir si
+     l'utilisateur le souhaite).
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - Commande "baziz.ia" (point d'entree / packaging)
+----------------------------------------------------------------
+OBJECTIF :
+  Lancer l'agent en tapant juste "baziz.ia" au lieu de
+  "python -m retroai_agent.main".
+
+FICHIERS CREES :
+  - pyproject.toml : metadata + [project.scripts] "baziz.ia" =
+    "retroai_agent.main:main" ; dependances requests/rich/prompt_toolkit ;
+    backend setuptools.
+
+INSTALLATION :
+  - pip install -e .  (mode editable : modifs du code prises en compte
+    sans reinstaller).
+
+DECISIONS TECHNIQUES :
+  - Point d'entree console_scripts -> cree un executable "baziz.ia" dans
+    le dossier Scripts de Python (sur le PATH).
+  - Le "." dans "baziz.ia" est accepte (Windows resout via PATHEXT ->
+    baziz.ia.exe ; Linux -> fichier baziz.ia).
+
+A SAVOIR (limite) :
+  - L'app lit .env / user_profile.json / session_history.json /
+    COMMANDES.txt dans le DOSSIER COURANT. Donc lancer "baziz.ia" depuis
+    le dossier du projet (ou definir NVIDIA_API_KEY en variable systeme).
+  - Apres install, ouvrir un nouveau terminal si la commande n'est pas
+    reconnue (PATH a recharger).
+
+FICHIERS MODIFIES :
+  - README.md : section "Raccourci : la commande baziz.ia" + arbo
+    (pyproject.toml).
+
+TESTS REALISES :
+  - pip install -e . -> exit 0.                                        OK
+  - which baziz.ia -> .../Scripts/baziz.ia ; lancement "baziz.ia" ->
+    banniere + invite OK (teste en pipe).                             OK
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - /exit affiche le grand AU REVOIR
+----------------------------------------------------------------
+OBJECTIF :
+  Le grand "AU REVOIR" ne s'affichait que sur Ctrl+C / Ctrl+D ; la
+  commande /exit (et /quit) montrait juste "Au revoir." en texte simple.
+
+FICHIERS MODIFIES :
+  - main.py : branche /exit, /quit -> ui.au_revoir() (au lieu de
+    ui.info("Au revoir.")).
+
+TESTS REALISES :
+  - "/exit" -> grand AU REVOIR pixelise affiche.                      OK
 
 ETAT : TERMINEE ET VALIDEE.

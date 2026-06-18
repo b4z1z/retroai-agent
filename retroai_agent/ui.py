@@ -35,6 +35,17 @@ except ImportError:  # pragma: no cover - depend de l'environnement
     RICH_DISPO = False
     _console = None
 
+# prompt_toolkit : auto-completion EN DIRECT des commandes (Windows + Linux).
+# Optionnel : si absent, on retombe sur une saisie classique.
+try:
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.formatted_text import HTML
+
+    PTK_DISPO = True
+except ImportError:  # pragma: no cover
+    PTK_DISPO = False
+
 
 # Palette : accent rouge.
 ACCENT = "#E03131"
@@ -53,6 +64,45 @@ LOGO = r"""████    ███   █████  ███  ████�
 
 
 # --------------------------------------------------------------------------- #
+#  Auto-completion des commandes (prompt_toolkit)                             #
+# --------------------------------------------------------------------------- #
+if PTK_DISPO:
+
+    class _CommandeCompleter(Completer):
+        """Propose en direct les commandes des que la saisie commence par '/'."""
+
+        def get_completions(self, document, complete_event):
+            texte = document.text_before_cursor.lstrip()
+            if not texte.startswith("/"):
+                return
+            # NOMS_COMMANDES est defini plus bas ; resolu au moment de l'appel.
+            for nom in NOMS_COMMANDES:
+                if nom.startswith(texte):
+                    yield Completion(
+                        nom,
+                        start_position=-len(texte),
+                        display=nom,
+                    )
+
+    # La session est creee PARESSEUSEMENT (au 1er usage, dans un vrai
+    # terminal). La creer a l'import planterait hors console reelle.
+    _session = None
+
+    def _obtenir_session():
+        """Retourne la PromptSession (creee a la demande), ou None si echec."""
+        global _session
+        if _session is None:
+            try:
+                _session = PromptSession(
+                    completer=_CommandeCompleter(),
+                    complete_while_typing=True,
+                )
+            except Exception:
+                return None
+        return _session
+
+
+# --------------------------------------------------------------------------- #
 #  Banniere et accueil                                                        #
 # --------------------------------------------------------------------------- #
 def banniere(modele: str) -> None:
@@ -63,9 +113,11 @@ def banniere(modele: str) -> None:
         contenu.append("Agent autonome CLI  ·  NVIDIA NIM\n", style="default")
         contenu.append(f"Modele : {modele}\n\n", style=DIM)
         contenu.append("/help", style=f"bold {ACCENT}")
-        contenu.append(" aide       ", style=DIM)
+        contenu.append(" aide     ", style=DIM)
+        contenu.append("/continue", style=f"bold {ACCENT}")
+        contenu.append(" reprendre     ", style=DIM)
         contenu.append("/reset", style=f"bold {ACCENT}")
-        contenu.append(" effacer       ", style=DIM)
+        contenu.append(" effacer     ", style=DIM)
         contenu.append("/exit", style=f"bold {ACCENT}")
         contenu.append(" quitter", style=DIM)
         _console.print()
@@ -77,7 +129,7 @@ def banniere(modele: str) -> None:
         print("=" * 70)
         print("   BAZIZ.IA  -  client CLI pour agent autonome (NIM)")
         print(f"   Modele : {modele}")
-        print("   /help aide  ·  /reset effacer  ·  /exit quitter")
+        print("   /help aide · /continue reprendre · /reset effacer · /exit quitter")
         print("=" * 70)
 
 
@@ -138,18 +190,41 @@ def lire_saisie() -> str:
     """
     Affiche une zone de saisie encadree (facon Claude Code) et lit la
     reponse de l'utilisateur. Peut lever EOFError / KeyboardInterrupt.
+
+    Si prompt_toolkit est dispo ET qu'on est dans un vrai terminal, on
+    profite de l'auto-completion EN DIRECT des commandes (tape '/').
+    Sinon, on retombe sur une saisie classique (rich, puis input()).
     """
+    # Haut du cadre (commun a tous les modes).
+    largeur = max(20, _console.size.width) if RICH_DISPO else 80
+    haut = "╭─ Vous " + "─" * max(0, largeur - 8)
     if RICH_DISPO:
-        largeur = max(20, _console.size.width)
-        haut = "╭─ Vous " + "─" * max(0, largeur - 8)
         _console.print()
         _console.print(haut, style=ACCENT)
-        # Le coin bas-gauche "╰─›" sert d'invite de saisie : le cadre parait
-        # ferme et soigne SANS devoir dessiner une ligne sous le curseur, ce
-        # qui est impossible avec input() (on ne peut rien afficher en dessous
-        # tant que l'utilisateur tape). Evite l'aspect "boite ouverte".
-        return _console.input(f"[{ACCENT}]╰─›[/] ").strip()
-    return input("\n› ").strip()
+    else:
+        print("\n" + haut)
+
+    # Mode 1 : prompt_toolkit (auto-completion live) — uniquement en vrai TTY.
+    if PTK_DISPO and sys.stdin.isatty():
+        session = _obtenir_session()
+        if session is not None:
+            try:
+                return session.prompt(
+                    HTML(f'<b><style fg="{ACCENT}">╰─› </style></b>')
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                raise
+            except Exception:
+                pass  # probleme ptk -> on retombe sur les modes suivants
+
+    # Le coin bas-gauche "╰─›" sert d'invite : le cadre parait ferme et soigne
+    # sans devoir dessiner une ligne sous le curseur (impossible avec input()).
+    # Mode 2 : rich (sans completion live).
+    if RICH_DISPO:
+        return _console.input(f"[bold {ACCENT}]╰─›[/] ").strip()
+
+    # Mode 3 : input() basique.
+    return input("╰─› ").strip()
 
 
 def reponse_agent(texte: str) -> None:
@@ -252,17 +327,57 @@ def reflexion(message: str = "Reflexion en cours…"):
 # --------------------------------------------------------------------------- #
 #  Aide                                                                       #
 # --------------------------------------------------------------------------- #
+# Source UNIQUE des commandes : utilisee par aide(), l'export texte et le
+# handler "/" de main.py. Modifier ici suffit a tout mettre a jour.
+COMMANDES = [
+    ("/help", "Affiche cette aide"),
+    ("/continue", "Reprend une tache interrompue / la session precedente"),
+    ("/reset", "Vide l'historique de la conversation"),
+    ("/exit, /quit", "Quitte le programme"),
+]
+
+
+# Liste plate des noms de commandes (pour les suggestions par prefixe).
+# "/exit, /quit" -> ["/exit", "/quit"].
+NOMS_COMMANDES = [
+    nom.strip()
+    for cmd, _ in COMMANDES
+    for nom in cmd.split(",")
+]
+
+
+def commandes_correspondantes(prefixe: str) -> list[str]:
+    """Retourne les commandes qui commencent par 'prefixe' (suggestions)."""
+    prefixe = prefixe.strip().lower()
+    return [nom for nom in NOMS_COMMANDES if nom.startswith(prefixe)]
+
+
+def suggestions(prefixe: str) -> None:
+    """Affiche des suggestions de commandes pour un prefixe saisi."""
+    correspondances = commandes_correspondantes(prefixe)
+    if RICH_DISPO:
+        if correspondances:
+            ligne = Text()
+            ligne.append("Suggestions : ", style=DIM)
+            ligne.append("   ".join(correspondances), style=f"bold {ACCENT}")
+            _console.print(ligne)
+        else:
+            _console.print(
+                f"[{DANGER}]Aucune commande ne correspond a « {prefixe} ».[/]"
+            )
+    else:
+        if correspondances:
+            print("  Suggestions : " + "   ".join(correspondances))
+        else:
+            print(f"  Aucune commande ne correspond a '{prefixe}'.")
+
+
 def aide() -> None:
-    """Affiche l'aide des commandes."""
-    lignes = [
-        ("/help", "Affiche cette aide"),
-        ("/reset", "Vide l'historique de la conversation"),
-        ("/exit, /quit", "Quitte le programme"),
-    ]
+    """Affiche l'aide des commandes (depuis la source unique COMMANDES)."""
     if RICH_DISPO:
         contenu = Text()
         contenu.append("Commandes disponibles\n\n", style=f"bold {ACCENT}")
-        for cmd, desc in lignes:
+        for cmd, desc in COMMANDES:
             contenu.append(f"  {cmd:14}", style=f"bold {ACCENT}")
             contenu.append(f"{desc}\n", style=DIM)
         contenu.append(
@@ -271,9 +386,37 @@ def aide() -> None:
         _console.print(Panel(contenu, border_style=DIM, padding=(1, 4), expand=True))
     else:
         print("\nCommandes disponibles :")
-        for cmd, desc in lignes:
+        for cmd, desc in COMMANDES:
             print(f"  {cmd:14} {desc}")
         print("Sinon, tapez votre demande et appuyez sur Entree.")
+
+
+def exporter_commandes(chemin: str = "COMMANDES.txt") -> None:
+    """
+    Ecrit un fichier texte listant toutes les commandes (facon 'help' cmd).
+    Genere depuis COMMANDES -> reste toujours a jour. Echec silencieux.
+    """
+    lignes = [
+        "============================================================",
+        "  BAZIZ.IA - Liste des commandes de l'interface",
+        "============================================================",
+        "",
+        "Tapez l'une de ces commandes a l'invite, ou '/' pour afficher",
+        "cette liste directement dans le terminal.",
+        "",
+    ]
+    for cmd, desc in COMMANDES:
+        lignes.append(f"  {cmd:14} {desc}")
+    lignes += [
+        "",
+        "Tout autre texte saisi est envoye comme message a l'agent.",
+        "",
+    ]
+    try:
+        with open(chemin, "w", encoding="utf-8") as f:
+            f.write("\n".join(lignes))
+    except OSError:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -310,7 +453,9 @@ def panneau_confirmation(titre: str, details: str, dangereux: bool = False) -> N
 
 
 def lire_oui_non(invite: str = "Confirmer ?") -> str:
-    """Lit une reponse y/n (retourne la chaine brute, en minuscules)."""
+    """Lit une reponse de confirmation (retourne la chaine brute, minuscules)."""
     if RICH_DISPO:
-        return _console.input(f"[bold]{invite}[/] [{DIM}][y/N][/] ").strip().lower()
-    return input(f"  {invite} [y/N] ").strip().lower()
+        return _console.input(
+            f"[bold {ACCENT}]{invite}[/] [{DIM}](y/n)[/] "
+        ).strip().lower()
+    return input(f"  {invite} (y/n) ").strip().lower()

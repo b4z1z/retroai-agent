@@ -4,6 +4,9 @@
 # Donnees personnelles : profil utilisateur local.
 user_profile.json
 
+# Historique de conversation sauvegarde (pour /continue).
+session_history.json
+
 # Python
 __pycache__/
 *.py[cod]

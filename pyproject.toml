@@ -1,0 +1,31 @@
+# ============================================================
+#  Packaging du projet : permet d'installer la commande "baziz.ia"
+#  Installation (depuis ce dossier) :
+#      pip install -e .
+#  Ensuite, lancer simplement :
+#      baziz.ia
+# ============================================================
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retroai-agent"
+version = "0.1.0"
+description = "BAZIZ.IA - client CLI leger pour agent autonome via l'API NVIDIA NIM"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.31.0",
+    # Interface soignee (repli texte simple si absentes - voir ui.py).
+    "rich>=13.0.0",
+    "prompt_toolkit>=3.0.0",
+]
+
+# Le point d'entree : la commande "baziz.ia" appelle retroai_agent.main:main
+[project.scripts]
+"baziz.ia" = "retroai_agent.main:main"
+
+[tool.setuptools]
+packages = ["retroai_agent"]
