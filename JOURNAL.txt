@@ -921,6 +921,10 @@ IDEES FUTURES (a faire plus tard, pas aujourd'hui)
       l'agent sans modifier le coeur. Piste : un dossier "plugins/",
       chaque plugin expose un schema JSON + une fonction ; chargement
       dynamique au demarrage et fusion dans TOOLS / TOOLS_SCHEMA.
+- [ ] TUTO TERMINAL interactif (onboarding) : un vrai tutoriel guide
+      DANS le terminal au 1er lancement (ou via commande /tuto), plus
+      helpful que les messages actuels : explique les commandes, fait
+      essayer un exemple, montre la confirmation y/n, etc.
 - [ ] LICENSE (choix en attente : MIT ou Tous droits reserves).
 - [ ] Interrupteur de test des pannes API (simuler un echec a l'etape N).
 - [ ] Tests automatises (pytest).
@@ -1009,5 +1013,20 @@ FICHIERS MODIFIES :
     tableaux Linux/macOS et Windows (verifier via --version, installer
     via apt / liens officiels), + notes de depannage (command not found,
     PATH a recharger, option "Add to PATH" sous Windows).
+
+ETAT : TERMINEE (a pousser).
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - README : section "Reinitialiser ses donnees"
+----------------------------------------------------------------
+OBJECTIF :
+  Expliquer comment remettre a zero le pseudo / les infos / l'historique.
+
+FICHIERS MODIFIES :
+  - README.md : nouvelle sous-section "Reinitialiser ses donnees /
+    parametres" -> tableau (user_profile.json = pseudo/infos ;
+    session_history.json = conversation ; les deux = reset complet) +
+    commandes rm (Linux) / del (Windows) + rappel commande /reset.
 
 ETAT : TERMINEE (a pousser).

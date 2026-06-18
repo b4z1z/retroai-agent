@@ -218,11 +218,29 @@ seul `y` (ou `o`) valide ; tout le reste annule.
 Au **tout premier lancement**, l'agent propose de renseigner un **pseudo** et
 quelques infos pour personnaliser l'expérience (avec votre accord). Ce choix
 est mémorisé dans `user_profile.json` (local, ignoré par git) et **n'est plus
-redemandé** ensuite. Pour que la question soit reposée, supprimez ce fichier :
+redemandé** ensuite.
+
+### Réinitialiser ses données / paramètres
+
+Toutes les données personnelles sont dans des fichiers locaux que vous pouvez
+supprimer à tout moment. L'agent les recréera proprement au prochain lancement.
+
+| Pour réinitialiser… | Supprimez | Effet |
+|---|---|---|
+| Le **pseudo** et les infos perso | `user_profile.json` | la question du profil est **reposée** au prochain lancement |
+| La **conversation** sauvegardée (`/continue`) | `session_history.json` | repart sur une conversation vierge |
+| **Tout** d'un coup | les deux fichiers | remise à zéro complète |
 
 ```bash
-rm user_profile.json        # Windows (cmd) : del user_profile.json
+# Linux / macOS
+rm user_profile.json session_history.json
+
+# Windows (cmd / PowerShell)
+del user_profile.json session_history.json
 ```
+
+> 💡 Pour vider seulement l'historique **sans quitter**, tapez la commande
+> `/reset` directement dans l'agent.
 
 ### Reprise après une erreur / un timeout
 
