@@ -938,3 +938,60 @@ FICHIERS MODIFIES :
     .env vs .env.example (lequel est suivi par git, ou mettre la cle).
 
 ETAT : TERMINEE.
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - install.sh robuste (Linux : pip/venv + raccourci)
+----------------------------------------------------------------
+CONTEXTE :
+  Sur Linux Mint l'utilisateur a eu "No module named pip" et le raccourci
+  baziz.ia disparaissait a chaque nouveau terminal (venv non active).
+  Question : est-ce que curl|sh telecharge bien tous les outils utilises ?
+
+CLARIFICATION :
+  - Les dependances (requests, rich, prompt_toolkit) sont declarees dans
+    pyproject.toml [project.dependencies]. "pip install -e ." les installe
+    AUTOMATIQUEMENT. Pas besoin de les lister dans install.sh.
+
+FICHIERS MODIFIES :
+  - scripts/install.sh refondu pour Linux :
+    1. installe git/python3/python3-pip/python3-venv via apt si manquants ;
+    2. clone/maj le depot ;
+    3. cree un venv (.venv) -> evite PEP 668 -> pip install -e . (=> tire
+       requests/rich/prompt_toolkit depuis pyproject.toml) ;
+    4. cree un lien ~/.local/bin/baziz.ia (commande globale, sans activer
+       le venv car le script du venv pointe vers son propre python) et
+       ajoute ~/.local/bin au PATH (.bashrc) si absent ;
+    5. cree .env depuis .env.example.
+
+NOTE :
+  - install.ps1 (Windows) laisse tel quel : pip present par defaut, pas de
+    PEP 668, baziz.ia va dans Scripts/ (deja sur le PATH).
+
+ETAT : TERMINEE (a pousser pour que le curl|sh utilise la nouvelle version).
+
+
+----------------------------------------------------------------
+[2026-06-18] ETAPE - install.sh : methode pipx (choix utilisateur)
+----------------------------------------------------------------
+OBJECTIF :
+  Remplacer la methode venv+symlink par pipx (choix de l'utilisateur)
+  pour une commande "baziz.ia" globale, isolee, sans venv a activer.
+
+FICHIERS MODIFIES :
+  - scripts/install.sh : installe git/python3/pipx (apt si besoin),
+    pipx ensurepath, clone/maj, puis "pipx install --force ." (qui tire
+    requests/rich/prompt_toolkit depuis pyproject.toml), cree .env.
+  - README.md : section "Raccourci" -> Linux/macOS = pipx (recommande),
+    Windows = pip dans un venv. Note mise a jour : git pull + pipx
+    install --force .
+
+POURQUOI pipx :
+  - Installe une APPLICATION CLI de facon isolee, commande sur le PATH
+    (~/.local/bin via pipx ensurepath), dispo dans tous les terminaux.
+  - Evite l'erreur PEP 668 et le besoin d'activer un venv a chaque fois.
+
+RAPPEL : baziz.ia lit .env dans le dossier courant -> lancer depuis le
+  dossier du projet.
+
+ETAT : TERMINEE (a pousser).

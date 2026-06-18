@@ -131,16 +131,28 @@ python -m retroai_agent.main
 ### Raccourci : la commande `baziz.ia`
 
 Pour lancer l'agent en tapant simplement **`baziz.ia`** (au lieu de la
-commande complète), installez le projet en mode éditable **une seule fois** :
+commande complète), installez-le **une seule fois**.
+
+**Linux / macOS — méthode recommandée : `pipx`** (commande globale, isolée,
+disponible dans tous les terminaux sans activer de venv) :
 
 ```bash
+sudo apt install pipx     # si pipx n'est pas déjà installé
+pipx ensurepath           # ajoute ~/.local/bin au PATH (une fois)
+cd retroai-agent
+pipx install .            # crée la commande "baziz.ia"
+```
+Ouvrez ensuite un **nouveau terminal**, puis depuis le dossier du projet :
+```bash
+baziz.ia
+```
+> Mise à jour plus tard : `git pull` puis `pipx install --force .`
+
+**Windows — `pip` (dans un venv) :**
+
+```powershell
 cd retroai-agent
 pip install -e .
-```
-
-Ensuite, depuis le dossier du projet :
-
-```bash
 baziz.ia
 ```
 
