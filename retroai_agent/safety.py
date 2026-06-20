@@ -22,15 +22,64 @@ from . import ui
 # Leur presence n'interdit pas l'execution, mais declenche un AVERTISSEMENT
 # renforce avant la confirmation habituelle.
 MOTIFS_DANGEREUX = [
-    (r"\brm\s+-[a-z]*r[a-z]*f", "Suppression recursive forcee (rm -rf)"),
-    (r"\bmkfs\b", "Formatage de systeme de fichiers (mkfs)"),
-    (r"\bdd\b", "Ecriture disque bas niveau (dd)"),
+    (r"\brm\s+-[a-z]*r[a-z]*f", "Forced recursive delete (rm -rf)"),
+    (r"\bmkfs\b", "Filesystem formatting (mkfs)"),
+    (r"\bdd\b", "Low-level disk write (dd)"),
     (r":\(\)\s*\{.*\|.*&\s*\}", "Fork bomb"),
-    (r">\s*/dev/sd[a-z]", "Ecriture directe sur un disque (/dev/sdX)"),
-    (r"\bchmod\s+-R\b", "Changement recursif de permissions (chmod -R)"),
-    (r"\bshutdown\b|\breboot\b", "Arret ou redemarrage de la machine"),
-    (r"\bmv\b.*\s+/\b", "Deplacement vers la racine /"),
+    (r">\s*/dev/sd[a-z]", "Direct write to a disk (/dev/sdX)"),
+    (r"\bchmod\s+-R\b", "Recursive permission change (chmod -R)"),
+    (r"\bshutdown\b|\breboot\b", "Machine shutdown or reboot"),
+    (r"\bmv\b.*\s+/\b", "Move to the root directory /"),
 ]
+
+
+# --------------------------------------------------------------------------- #
+#  Liste blanche : commandes shell LECTURE SEULE pouvant etre auto-executees  #
+#  (uniquement si l'option AUTO_SAFE_COMMANDS est activee, et sous conditions  #
+#  strictes verifiees par est_commande_sure()).                               #
+# --------------------------------------------------------------------------- #
+COMMANDES_SURES = {
+    "ls", "pwd", "echo", "cat", "head", "tail", "wc", "date", "whoami",
+    "hostname", "df", "du", "uname", "env", "printenv", "which", "file",
+    "stat", "tree", "id", "uptime", "free", "ps", "basename", "dirname",
+    "realpath", "grep", "find", "cut", "uniq", "nl", "tac", "column",
+}
+
+# Caracteres qui peuvent transformer une commande douce en commande dangereuse
+# (redirections, pipes, sous-shell, substitution, chainage...).
+METACARACTERES_DANGEREUX = set(">|<&;$`(){}\n")
+
+# Flags de "find" qui EXECUTENT ou SUPPRIMENT -> jamais auto.
+FIND_FLAGS_DANGEREUX = ("-exec", "-execdir", "-delete", "-fprint", "-fls", "-ok")
+
+
+def est_commande_sure(commande: str) -> bool:
+    """
+    Retourne True UNIQUEMENT si la commande peut etre auto-executee sans
+    risque : premier mot dans la liste blanche, AUCUN metacaractere
+    (>, |, ;, &, $, (), backtick...), et pas de flag dangereux pour find.
+
+    Au moindre doute -> False (on redemandera confirmation).
+    """
+    if not commande or not commande.strip():
+        return False
+
+    # 1. Aucun metacaractere (bloque redirections, pipes, $(...), chainage...).
+    if any(c in METACARACTERES_DANGEREUX for c in commande):
+        return False
+
+    # 2. Le premier mot doit etre dans la liste blanche (nom simple, pas de /).
+    premier = commande.split()[0]
+    if premier not in COMMANDES_SURES:
+        return False
+
+    # 3. find : refuser les flags qui executent / suppriment.
+    if premier == "find":
+        bas = commande.lower()
+        if any(flag in bas for flag in FIND_FLAGS_DANGEREUX):
+            return False
+
+    return True
 
 
 def detecter_danger(commande: str) -> str | None:
@@ -54,15 +103,15 @@ def demander_confirmation(titre: str, details: str = "", dangereux: bool = False
     ui.panneau_confirmation(titre, details, dangereux=dangereux)
 
     try:
-        reponse = ui.lire_oui_non("Confirmer ?")
+        reponse = ui.lire_oui_non("Confirm?")
     except (EOFError, KeyboardInterrupt):
         # Pas d'entree disponible ou interruption => on refuse par securite.
-        ui.info("→ Refuse (aucune confirmation).")
+        ui.info("→ Refused (no confirmation).")
         return False
 
     accepte = reponse in ("y", "o", "yes", "oui")
     if accepte:
-        ui.succes("→ Accepte.")
+        ui.succes("→ Approved.")
     else:
-        ui.info("→ Refuse.")
+        ui.info("→ Refused.")
     return accepte

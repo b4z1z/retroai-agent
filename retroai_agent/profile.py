@@ -56,18 +56,18 @@ def _demander(question: str) -> str:
 
 def creer_profil_interactif() -> dict:
     """Collecte les infos de l'utilisateur (toutes optionnelles)."""
-    print("  (Laissez vide et appuyez sur Entree pour ignorer une question.)")
+    print("  (Leave blank and press Enter to skip a question.)")
     profil: dict = {}
 
-    pseudo = _demander("Votre pseudo :")
+    pseudo = _demander("Your nickname:")
     if pseudo:
         profil["pseudo"] = pseudo
 
-    role = _demander("Que faites-vous ? (metier, etudes, niveau...) :")
+    role = _demander("What do you do? (job, studies, level...):")
     if role:
         profil["role"] = role
 
-    prefs = _demander("Preferences ou infos a retenir (optionnel) :")
+    prefs = _demander("Preferences or info to remember (optional):")
     if prefs:
         profil["preferences"] = prefs
 
@@ -86,22 +86,22 @@ def initialiser_profil(chemin: str = CHEMIN_PROFIL) -> dict:
 
     # --- Premier lancement : demande de consentement -------------------
     print()
-    print("  Bienvenue ! Souhaitez-vous renseigner un pseudo et quelques")
-    print("  informations de base pour personnaliser l'experience ?")
-    print("  (Tout reste local sur votre machine, rien n'est envoye ailleurs.)")
+    print("  Welcome! Would you like to set a nickname and a few basic")
+    print("  details to personalize your experience?")
+    print("  (Everything stays local on your machine, nothing is sent anywhere.)")
     try:
-        reponse = input("  Partager ces infos ? [y/N] ").strip().lower()
+        reponse = input("  Share this info? [y/N] ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         reponse = ""
 
     if reponse in ("y", "o", "yes", "oui"):
         profil = creer_profil_interactif()
         profil["partage"] = True
-        print("  Merci ! Vos preferences ont ete enregistrees.")
+        print("  Thanks! Your preferences have been saved.")
     else:
         # On memorise le refus pour ne plus reposer la question.
         profil = {"partage": False}
-        print("  Pas de souci, aucune information ne sera enregistree.")
+        print("  No problem, no information will be saved.")
 
     sauver_profil(profil, chemin)
     return profil
@@ -117,17 +117,17 @@ def profil_en_texte(profil: dict) -> str:
 
     morceaux = []
     if profil.get("pseudo"):
-        morceaux.append(f"L'utilisateur utilise le pseudo {profil['pseudo']}.")
+        morceaux.append(f"The user's nickname is {profil['pseudo']}.")
     if profil.get("role"):
-        morceaux.append(f"Son activite : {profil['role']}.")
+        morceaux.append(f"Their activity: {profil['role']}.")
     if profil.get("preferences"):
-        morceaux.append(f"Preferences a retenir : {profil['preferences']}.")
+        morceaux.append(f"Preferences to remember: {profil['preferences']}.")
 
     if not morceaux:
         return ""
 
     return (
-        "Informations sur l'utilisateur (utilise-les pour personnaliser tes "
-        "reponses et adresse-toi a lui par son pseudo quand c'est naturel) :\n"
+        "Information about the user (use it to personalize your answers and "
+        "address them by their nickname when it feels natural):\n"
         + " ".join(morceaux)
     )

@@ -22,6 +22,8 @@ dependencies = [
     # Interface soignee (repli texte simple si absentes - voir ui.py).
     "rich>=13.0.0",
     "prompt_toolkit>=3.0.0",
+    # Lecture d'image depuis le presse-papiers (commande /paste).
+    "pillow>=9.0.0",
 ]
 
 # Le point d'entree : la commande "baziz.ia" appelle retroai_agent.main:main

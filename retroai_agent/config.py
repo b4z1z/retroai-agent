@@ -23,11 +23,12 @@ from dataclasses import dataclass
 class Config:
     """Regroupe tous les reglages de l'application dans un seul objet."""
 
-    api_key: str          # Cle API NVIDIA (obligatoire)
-    base_url: str         # URL de l'endpoint chat/completions
-    model: str            # Nom du modele a interroger
-    enable_thinking: bool # Mode raisonnement active ou non
-    shell_timeout: int    # Delai max (s) pour une commande shell
+    api_key: str            # Cle API NVIDIA (obligatoire)
+    base_url: str           # URL de l'endpoint chat/completions
+    model: str              # Nom du modele a interroger
+    enable_thinking: bool   # Mode raisonnement active ou non
+    shell_timeout: int      # Delai max (s) pour une commande shell
+    auto_safe_commands: bool  # Auto-execute les commandes shell sures (opt-in)
 
 
 # --------------------------------------------------------------------------- #
@@ -105,9 +106,9 @@ def load_config(dotenv_path: str = ".env") -> Config:
     api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
     if not api_key:
         raise SystemExit(
-            "Erreur de configuration : NVIDIA_API_KEY est manquante.\n"
-            "  -> Copiez .env.example en .env et renseignez votre cle,\n"
-            "     ou exportez la variable : export NVIDIA_API_KEY=nvapi-..."
+            "Configuration error: NVIDIA_API_KEY is missing.\n"
+            "  -> Copy .env.example to .env and fill in your key,\n"
+            "     or export the variable: export NVIDIA_API_KEY=nvapi-..."
         )
 
     # 3. Valeurs OPTIONNELLES avec defauts alignes sur le cahier des charges.
@@ -120,4 +121,5 @@ def load_config(dotenv_path: str = ".env") -> Config:
         model=os.environ.get("NVIDIA_MODEL", "moonshotai/kimi-k2.6"),
         enable_thinking=_env_bool("ENABLE_THINKING", True),
         shell_timeout=_env_int("SHELL_TIMEOUT", 30),
+        auto_safe_commands=_env_bool("AUTO_SAFE_COMMANDS", False),
     )

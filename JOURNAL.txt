@@ -925,6 +925,20 @@ IDEES FUTURES (a faire plus tard, pas aujourd'hui)
       DANS le terminal au 1er lancement (ou via commande /tuto), plus
       helpful que les messages actuels : explique les commandes, fait
       essayer un exemple, montre la confirmation y/n, etc.
+- [x] BOUTON STOP (interrompre sans quitter) : FAIT le 2026-06-19.
+      Ctrl+C pendant la reflexion -> stop + retour au prompt sans quitter,
+      progression conservee (tour_incomplet) -> /continue reprend.
+      CONFIRME OK par l'utilisateur en vrai terminal.
+- [x] AJOUT DE PHOTOS / IMAGES : FAIT le 2026-06-19. Le modele kimi-k2.6
+      via NIM SUPPORTE la vision (teste : repond la bonne couleur). Module
+      images.py : detecte les chemins d'images dans le message, encode en
+      base64 data-URI, construit le content multimodal (text + image_url).
+      Voir l'etape detaillee plus bas.
+- [ ] GESTION HISTORIQUE facon CLAUDE CODE : plusieurs sessions par projet,
+      avec liste/choix (comme "claude --resume") et reprise de la derniere
+      (comme "claude --continue"). Aujourd'hui on a juste 1 session_history
+      .json + /continue ; etendre vers plusieurs conversations nommees,
+      horodatees, listables et selectionnables.
 - [ ] LICENSE (choix en attente : MIT ou Tous droits reserves).
 - [ ] Interrupteur de test des pannes API (simuler un echec a l'etape N).
 - [ ] Tests automatises (pytest).
@@ -1030,3 +1044,232 @@ FICHIERS MODIFIES :
     commandes rm (Linux) / del (Windows) + rappel commande /reset.
 
 ETAT : TERMINEE (a pousser).
+
+
+----------------------------------------------------------------
+[2026-06-19] DEBUG - Erreur API sur Linux (403 puis 500) -> RESOLU
+----------------------------------------------------------------
+SYMPTOME :
+  Sur Linux, baziz.ia renvoyait "HTTP 403 forbidden / authorization failed".
+
+DIAGNOSTIC (methode) :
+  - Test direct via curl (sans passer par le code) pour isoler.
+  - 403 = rejet a l'AUTHENTIFICATION -> la cle elle-meme est en cause.
+  - CAUSE : le .env Linux avait ete cree par l'installeur (cp .env.example
+    .env) -> contenait le PLACEHOLDER (ou une cle mal copiee), pas la vraie.
+
+CORRECTION :
+  - Mettre la VRAIE cle (celle qui marche sous Windows) dans le .env Linux.
+  - Apres correction : passage de 403 -> 500.
+    * 500 = erreur SERVEUR NVIDIA (l'auth est passee) = transient.
+    * Resolu en reessayant (le serveur a refonctionne).
+
+LECONS :
+  - 403/401 = probleme de CLE ; 500 = probleme SERVEUR (souvent passager).
+  - Tester la cle au curl direct est le meilleur moyen d'isoler cle vs code.
+  - L'installeur cree .env depuis .env.example -> TOUJOURS y mettre sa vraie
+    cle ensuite (sinon 403 garanti).
+
+ETAT : RESOLU - BAZIZ.IA fonctionne sur Linux.
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Bouton STOP (Ctrl+C interrompt sans quitter)
+----------------------------------------------------------------
+OBJECTIF :
+  Pouvoir stopper l'agent en pleine reflexion / boucle d'outils avec
+  Ctrl+C, revenir au prompt SANS quitter l'appli, et CONSERVER la
+  progression (reprise possible via /continue).
+
+FICHIERS MODIFIES :
+  - agent_loop.py : _executer_tour() attrape desormais aussi
+    KeyboardInterrupt (en plus d'ApiError) -> tour_incomplet=True +
+    sauver_session() + raise. La progression (resultats d'outils, etapes)
+    est preservee.
+  - main.py : _traiter_reponse() -> sur KeyboardInterrupt appelle
+    ui.stop_reflexion() (au lieu d'un simple "[Interrompu.]").
+  - ui.py : nouvelle fonction stop_reflexion() (message "⏹ Reflexion
+    stoppee. Tape /continue pour reprendre", rich + fallback texte).
+
+COMPORTEMENT :
+  - Ctrl+C PENDANT la reflexion/les outils -> stop + retour au prompt
+    (appli reste ouverte) + progression conservee -> /continue reprend.
+  - Ctrl+C / Ctrl+D a l'invite (idle) -> quitte l'appli (grand AU REVOIR),
+    comportement inchange (standard CLI).
+  - Ctrl+C pendant une confirmation y/n -> refus (securite, inchange).
+
+TESTS REALISES :
+  - Simulation outil execute puis KeyboardInterrupt -> remonte au main,
+    tour_incomplet=True, 4 messages conserves (progression OK).        OK
+  - Message stop_reflexion() affiche correctement.                     OK
+  - App demarre sans erreur (smoke test).                              OK
+  - NOTE : le Ctrl+C reel pendant le spinner rich est a confirmer en
+    vrai terminal (non testable en pipe).
+
+ETAT : TERMINEE (a confirmer Ctrl+C reel cote terminal).
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Interface en ANGLAIS + indicateur "Ctrl+C to stop"
+----------------------------------------------------------------
+OBJECTIF :
+  1) Traduire TOUS les messages d'interface en anglais (produit client).
+  2) Ajouter un indicateur montrant comment stopper -> place dans le
+     spinner de reflexion : "Thinking… (Ctrl+C to stop)".
+
+FICHIERS MODIFIES (messages utilisateur -> anglais) :
+  - ui.py : banniere, saluer ("Welcome back"), cadre saisie ("You"),
+    reponse vide, stop_reflexion ("Stopped / Type /continue to resume"),
+    reflexion ("Thinking… (Ctrl+C to stop)"), [TOOL], "(+N lines)",
+    COMMANDES (descriptions EN), suggestions, aide ("Available commands"),
+    exporter_commandes, panneau_confirmation ("DANGEROUS ACTION /
+    Confirmation required / Action:"), lire_oui_non ("Confirm?").
+    + au_revoir : "AU REVOIR" -> "GOODBYE" (police pixel : ajout G,D,B,Y,
+    retrait V,U,R,I,A devenus inutiles -> en fait garde A; glyphes
+    G/O/D/B/Y/E presents).
+  - main.py : /reset "History cleared", /continue (Resuming / Previous
+    session restored / Incomplete task detected / No previous session),
+    "Unknown command", message ApiError ("Progress saved...").
+  - safety.py : MOTIFS_DANGEREUX (EN), "Confirm?", "Approved/Refused".
+  - tools.py : tous les messages d'outils (erreurs, apercu File/Size/
+    Preview, Command, WARNING, exit code, bytes...) en anglais.
+  - agent_loop.py : SYSTEME en anglais (reponds dans la langue de
+    l'utilisateur) ; "[Tool result: ...]", limite, retry, erreurs.
+  - api_client.py : messages ApiError (timeout, network, 429, HTTP, JSON).
+  - config.py : message NVIDIA_API_KEY manquante en anglais.
+  - profile.py : consentement + questions (nickname...) en anglais.
+
+NOTE :
+  - SYSTEME demande desormais a l'agent de repondre DANS LA LANGUE DE
+    L'UTILISATEUR (donc FR si l'utilisateur ecrit en FR). Seule l'interface
+    (chrome) est en anglais.
+  - README laisse en francais (doc), non concerne par la demande.
+
+TESTS REALISES :
+  - Banniere/aide/GOODBYE en anglais, rendu OK.                       OK
+  - Confirmation "DANGEROUS ACTION / Confirm? (y/n) / Refused".        OK
+  - Spinner affiche "Thinking… (Ctrl+C to stop)".                     OK
+
+ETAT : TERMINEE.
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Support des IMAGES (vision / multimodal)
+----------------------------------------------------------------
+OBJECTIF :
+  Envoyer une image a l'agent en referencant son chemin dans le message
+  (ex. "describe photo.png").
+
+VERIFICATION PREALABLE (cruciale) :
+  - Test direct API : PNG rouge genere sans dependance (struct/zlib),
+    envoye en content multimodal {text + image_url base64}. Le modele a
+    repondu "Red" -> kimi-k2.6 via NIM SUPPORTE la vision. OK.
+
+FICHIERS CREES :
+  - images.py : extraire_chemins_images, encoder_image (data-URI base64),
+    construire_contenu(texte) -> (str, []) si pas d'image, sinon
+    (liste multimodale [text + image_url], [noms d'images]). MAX 8 Mo.
+
+FICHIERS MODIFIES :
+  - agent_loop.py : envoyer() utilise images.construire_contenu() ; si
+    images -> ui.image_jointe(nom) + content = liste multimodale.
+    SYSTEME : "if the user references an image, it is ALREADY attached:
+    look at it directly, don't inspect it with shell tools".
+  - ui.py : image_jointe(nom) -> "🖼 image attached: <nom>".
+
+OBSTACLES / BUGS :
+  - [BUG] 1er test : ponctuation collee au chemin ("photo.png?") -> ext
+    ".png?" non reconnue -> image NON jointe ; le modele a DEVINE "Red"
+    depuis le nom "test_rouge" (faux positif trompeur !). FIX : _nettoyer()
+    retire ponctuation de fin + parentheses/guillemets/@.
+  - RE-TEST nom NEUTRE : image bleue -> "Blue" ; verte -> "green square".
+    Preuve qu'il VOIT vraiment l'image. OK.
+
+LIMITE CONNUE :
+  - Images base64 stockees dans session_history.json -> fichier volumineux
+    + re-envoi a chaque tour. Acceptable pour l'instant.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Commandes /add-image et /paste (images sans chemin)
+----------------------------------------------------------------
+OBJECTIF :
+  Joindre une image SANS taper le chemin :
+  - /add-image : ouvre une fenetre de selection de fichier (gestionnaire)
+  - /paste     : recupere l'image du presse-papiers (ex. capture d'ecran)
+  (Rappel : coller une image directement dans le terminal texte est
+   impossible -> ces commandes contournent la limite.)
+
+FICHIERS MODIFIES :
+  - images.py : choisir_image_dialogue() (tkinter filedialog) ;
+    image_depuis_presse_papiers() (Pillow ImageGrab -> PNG temporaire) ;
+    construire_contenu(texte, chemins_explicites) accepte des images en plus.
+  - agent_loop.py : envoyer(message, chemins_images=None).
+  - ui.py : COMMANDES += /add-image, /paste (visibles dans menu "/" et aide) ;
+    demander_texte() pour la legende de l'image.
+  - main.py : handlers /add-image et /paste -> _envoyer_avec_image() (demande
+    une legende puis _traiter_reponse avec chemins_images) ; _traiter_reponse
+    accepte chemins_images.
+  - pyproject.toml / requirements.txt : ajout pillow>=9.0.0.
+  - scripts/install.sh : ajout python3-tk aux prerequis apt (pour /add-image).
+  - README.md : 3 facons d'envoyer une image (chemin, /add-image, /paste).
+
+DECISIONS :
+  - tkinter (stdlib) pour le selecteur -> pas de dep pip (Linux: python3-tk).
+  - Pillow pour le presse-papiers (multiplateforme). Reuse l'attachement
+    multimodal deja en place (envoyer affiche "image attached").
+  - Repli propre : si presse-papiers vide / Pillow absent / tkinter absent
+    -> message d'erreur clair, l'appli continue.
+
+TESTS REALISES :
+  - imports OK ; NOMS_COMMANDES contient /add-image et /paste.        OK
+  - /help affiche les 2 nouvelles commandes.                          OK
+  - /paste sans image -> "No image found in the clipboard...".        OK
+  - Pillow 12.2.0 present sous Windows -> /paste pret a l'usage.       OK
+  - App demarre sans erreur.                                          OK
+  - NOTE : test reel du dialogue/presse-papiers a faire en vrai terminal
+    (GUI non disponible en pipe).
+
+ETAT : TERMINEE (test GUI a confirmer cote utilisateur).
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Liste blanche commandes sures (auto-exec opt-in)
+----------------------------------------------------------------
+OBJECTIF :
+  Eviter de demander confirmation pour les commandes shell LECTURE SEULE
+  (ls, cat, echo, find, grep...) -> plus rapide. MAIS securise et opt-in.
+
+FICHIERS MODIFIES :
+  - config.py : Config.auto_safe_commands (bool) ; AUTO_SAFE_COMMANDS,
+    defaut False.
+  - .env.example : AUTO_SAFE_COMMANDS=false (+ explication).
+  - safety.py : COMMANDES_SURES (liste blanche lecture seule),
+    METACARACTERES_DANGEREUX (> | < & ; $ ` (){} \n), FIND_FLAGS_DANGEREUX
+    (-exec/-execdir/-delete/-fprint/-fls/-ok), est_commande_sure().
+  - tools.py : run_shell_command -> si config.auto_safe_commands ET
+    est_commande_sure() -> auto-exec sans confirmation (avec message
+    "(safe read-only command...)"). Sinon confirmation comme avant.
+
+SECURITE (le point cle) :
+  - Juger "safe" sur le 1er mot ne suffit PAS : "echo x > f" ecrit, "find
+    -delete" supprime, "echo $(rm)" substitue, "a ; rm" chaine.
+  - est_commande_sure() exige : 1er mot dans liste blanche + AUCUN
+    metacaractere + pas de flag find dangereux. Au moindre doute -> False.
+  - OPT-IN, defaut OFF -> reste "ultra-securise par defaut" (cahier des
+    charges). Confirmation 100% tant que l'option n'est pas activee.
+
+OBSTACLES / BUGS :
+  - [BUG] "find" oublie dans COMMANDES_SURES (alors que son cas special
+    etait code) -> "find . -name x" refuse a tort. FIX : ajout de find
+    (+ cut, uniq, nl, tac, column).
+
+TESTS REALISES :
+  - est_commande_sure : 16 cas (surs True, pieges echo>/find -delete/
+    -exec/;/$()/|/&&/backtick/sed -i False) -> TOUS CORRECTS.
+  - Flux reel option ON : 'echo' auto-exec sans confirmation ; 'echo x > f'
+    redemande confirmation (garde-fou).                                OK
+
+ETAT : TERMINEE ET VALIDEE.

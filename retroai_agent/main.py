@@ -21,6 +21,7 @@ from .api_client import ApiClient, ApiError
 from .agent_loop import AgentLoop
 from . import profile
 from . import ui
+from . import images
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -48,27 +49,35 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/reset":
             agent.reset()
-            ui.info("Historique vide.")
+            ui.info("History cleared.")
             continue
         if saisie == "/continue":
             # Cas 1 : un tour de la session COURANTE a ete interrompu (echec
             # API) -> on reprend exactement la ou ca s'est arrete.
             if agent.tour_incomplet:
-                ui.info("Reprise de la tache interrompue…")
+                ui.info("Resuming interrupted task…")
                 _traiter_reponse(agent, reprise=True)
             # Cas 2 : pas d'interruption en memoire -> on recharge le disque.
             elif agent.charger_session():
                 ui.info(
-                    f"Session precedente restauree "
+                    f"Previous session restored "
                     f"({len(agent.historique)} messages)."
                 )
                 # Si la session rechargee est incomplete (dernier message =
                 # utilisateur sans reponse), on reprend la tache.
                 if agent.historique and agent.historique[-1].get("role") == "user":
-                    ui.info("Tache incomplete detectee — reprise…")
+                    ui.info("Incomplete task detected — resuming…")
                     _traiter_reponse(agent, reprise=True)
             else:
-                ui.info("Aucune session precedente a restaurer.")
+                ui.info("No previous session to restore.")
+            continue
+        if saisie == "/add-image":
+            _envoyer_avec_image(agent, images.choisir_image_dialogue(),
+                                source="file dialog")
+            continue
+        if saisie == "/paste":
+            _envoyer_avec_image(agent, images.image_depuis_presse_papiers(),
+                                source="clipboard")
             continue
         # Taper juste "/" (ou "/?") affiche la liste complete des commandes.
         if saisie in ("/", "/?"):
@@ -80,7 +89,7 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             if ui.commandes_correspondantes(saisie):
                 ui.suggestions(saisie)
             else:
-                ui.erreur(f"Commande inconnue : {saisie}")
+                ui.erreur(f"Unknown command: {saisie}")
                 ui.aide()
             continue
 
@@ -89,7 +98,31 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         _traiter_reponse(agent, saisie=saisie)
 
 
-def _traiter_reponse(agent: AgentLoop, *, saisie: str = "", reprise: bool = False) -> None:
+def _envoyer_avec_image(agent: AgentLoop, chemin, *, source: str) -> None:
+    """
+    Joint une image (choisie via dialogue ou presse-papiers) au prochain
+    message et l'envoie a l'agent.
+    """
+    if not chemin:
+        if source == "clipboard":
+            ui.erreur("No image found in the clipboard "
+                      "(or Pillow not installed: pip install pillow).")
+        else:
+            ui.erreur("No image selected "
+                      "(or file dialog unavailable: install python3-tk).")
+        return
+    try:
+        texte = ui.demander_texte("Message about this image (Enter to just describe):")
+    except (EOFError, KeyboardInterrupt):
+        ui.info("\nCancelled.")
+        return
+    if not texte:
+        texte = "Describe this image."
+    _traiter_reponse(agent, saisie=texte, chemins_images=[chemin])
+
+
+def _traiter_reponse(agent: AgentLoop, *, saisie: str = "", reprise: bool = False,
+                     chemins_images=None) -> None:
     """
     Lance un tour de l'agent (nouveau message ou reprise d'un tour interrompu)
     et affiche la reponse. En cas d'echec API, la progression est CONSERVEE
@@ -99,16 +132,18 @@ def _traiter_reponse(agent: AgentLoop, *, saisie: str = "", reprise: bool = Fals
         if reprise:
             reponse = agent.reprendre()
         else:
-            reponse = agent.envoyer(saisie)
+            reponse = agent.envoyer(saisie, chemins_images=chemins_images)
     except ApiError as exc:
         ui.erreur(str(exc))
         ui.info(
-            "Progression conservee. Tape /continue pour reprendre "
-            "la ou ca s'est arrete (sans tout refaire)."
+            "Progress saved. Type /continue to resume where it "
+            "stopped (no need to redo)."
         )
         return
     except KeyboardInterrupt:
-        ui.info("\n[Interrompu.]")
+        # Ctrl+C pendant la reflexion = STOP : on revient au prompt sans
+        # quitter l'appli. La progression est conservee (cf. _executer_tour).
+        ui.stop_reflexion()
         return
     ui.reponse_agent(reponse)
 

@@ -150,6 +150,13 @@ dans `.env` (ignoré par git) ou dans une variable d'environnement.
 | `NVIDIA_MODEL`     | ❌          | `moonshotai/kimi-k2.6`                                       | Modèle interrogé.                            |
 | `ENABLE_THINKING`  | ❌          | `true`                                                      | Active le mode raisonnement.                 |
 | `SHELL_TIMEOUT`    | ❌          | `30`                                                        | Délai max (s) d'une commande shell.          |
+| `AUTO_SAFE_COMMANDS` | ❌        | `false`                                                     | Auto-exécute les commandes shell **lecture seule** sûres (`ls`, `cat`, `echo`, `find`, `grep`…) sans confirmation. |
+
+> 🔒 **`AUTO_SAFE_COMMANDS`** : par défaut `false` (toute commande shell est
+> confirmée). Si activé, seules les commandes d'une **liste blanche** lecture
+> seule s'exécutent sans demander — et **uniquement** si elles ne contiennent
+> aucun caractère dangereux (`>`, `|`, `;`, `&`, `$(...)`, `` ` ``) ni flag
+> destructeur (`find -exec`, `-delete`…). Au moindre doute, confirmation requise.
 
 ---
 
@@ -213,6 +220,30 @@ Tapez n'importe quel autre texte pour dialoguer avec l'agent. Lorsqu'il propose
 une écriture de fichier ou une commande shell, il demande **`Confirmer ? (y/n)`** :
 seul `y` (ou `o`) valide ; tout le reste annule.
 
+**⏹ Stopper l'agent** : pendant qu'il réfléchit ou utilise des outils, appuyez
+sur **`Ctrl+C`** pour **interrompre sans quitter** l'application. La progression
+déjà faite est conservée : tapez **`/continue`** pour reprendre là où ça s'est
+arrêté. (À l'invite vide, `Ctrl+C` quitte l'application.)
+
+**🖼 Envoyer une image** : le modèle sait analyser des images. Trois façons :
+
+1. **Mentionner le chemin** dans votre message (l'agent la joint automatiquement) :
+   ```
+   What is in photo.png ?
+   Describe @captures/screenshot.jpg in detail
+   ```
+2. **`/add-image`** → ouvre une **fenêtre de sélection de fichier** pour choisir
+   l'image, puis demande votre message.
+3. **`/paste`** → envoie l'**image du presse-papiers** (ex. une capture d'écran),
+   puis demande votre message.
+
+Formats : png, jpg, jpeg, gif, webp, bmp. Taille max 8 Mo. Vous verrez
+`🖼 image attached: <nom>` quand une image est jointe.
+
+> Dépendances pour ces commandes : `/paste` nécessite **Pillow**
+> (`pip install pillow`, déjà inclus) ; `/add-image` nécessite **tkinter**
+> (Linux : `sudo apt install python3-tk`).
+
 ### Profil utilisateur (optionnel)
 
 Au **tout premier lancement**, l'agent propose de renseigner un **pseudo** et
@@ -273,6 +304,7 @@ retroai-agent/
      ├── config.py        # configuration (variables d'environnement)
      ├── safety.py        # garde-fous et confirmations
      ├── profile.py       # profil utilisateur optionnel (pseudo, perso)
+     ├── images.py        # support des images en entrée (vision/multimodal)
      └── ui.py            # affichage terminal (rich, style Claude Code)
 ```
 

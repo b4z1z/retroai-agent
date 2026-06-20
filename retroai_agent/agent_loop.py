@@ -28,6 +28,7 @@ from .api_client import ApiClient, ApiError
 from .config import Config
 from . import tools
 from . import ui
+from . import images
 
 
 # Fichier local de sauvegarde de la conversation (pour /continue).
@@ -36,10 +37,12 @@ CHEMIN_SESSION = "session_history.json"
 
 # Message systeme : definit le role et le comportement de l'agent.
 SYSTEME = (
-    "Tu es BAZIZ.IA, un agent autonome qui aide l'utilisateur depuis un "
-    "terminal Linux. Tu disposes d'outils pour lire/ecrire des fichiers, "
-    "lister des repertoires et executer des commandes shell. Utilise-les "
-    "quand c'est utile. Reponds de maniere concise et en francais."
+    "You are BAZIZ.IA, an autonomous agent that helps the user from a "
+    "Linux terminal. You have tools to read/write files, list directories "
+    "and run shell commands. Use them when useful. Reply concisely, in the "
+    "same language as the user. If the user references an image file, that "
+    "image is ALREADY attached to the message: look at it directly, do not "
+    "try to open or inspect it with shell tools."
 )
 
 # Garde-fou anti-boucle infinie : nombre max d'aller-retours outils par tour.
@@ -137,19 +140,28 @@ class AgentLoop:
             except ApiError as exc:
                 derniere_erreur = exc
                 if tentative == 0:
-                    ui.info("Echec/timeout — nouvelle tentative automatique…")
+                    ui.info("Failure/timeout — retrying automatically…")
         # Les deux tentatives ont echoue.
         raise derniere_erreur  # type: ignore[misc]
 
     # ------------------------------------------------------------------ #
     #  Traitement d'un tour de parole utilisateur                        #
     # ------------------------------------------------------------------ #
-    def envoyer(self, message_utilisateur: str) -> str:
+    def envoyer(self, message_utilisateur: str, chemins_images=None) -> str:
         """
         Ajoute le message de l'utilisateur puis traite le tour complet
         (appels API + outils) et retourne la reponse finale de l'agent.
+
+        Les images sont jointes (contenu multimodal) si elles sont
+        referencees dans le texte OU fournies via chemins_images (issu de
+        /paste ou /add-image).
         """
-        self.historique.append({"role": "user", "content": message_utilisateur})
+        contenu, images_jointes = images.construire_contenu(
+            message_utilisateur, chemins_images
+        )
+        for nom in images_jointes:
+            ui.image_jointe(nom)
+        self.historique.append({"role": "user", "content": contenu})
         return self._executer_tour()
 
     def reprendre(self) -> str:
@@ -172,8 +184,10 @@ class AgentLoop:
         """
         try:
             reponse_finale = self._dialoguer()
-        except ApiError:
-            # Echec : on marque le tour comme incomplet et on PRESERVE tout.
+        except (ApiError, KeyboardInterrupt):
+            # Echec API OU stop utilisateur (Ctrl+C) : on marque le tour
+            # comme incomplet et on PRESERVE tout (resultats d'outils, etapes).
+            # -> /continue pourra reprendre la ou ca s'est arrete.
             self.tour_incomplet = True
             self.sauver_session()
             raise
@@ -191,7 +205,7 @@ class AgentLoop:
             try:
                 message = reponse["choices"][0]["message"]
             except (KeyError, IndexError) as exc:
-                raise ApiError(f"Reponse API inattendue : {exc}") from exc
+                raise ApiError(f"Unexpected API response: {exc}") from exc
 
             tool_calls = message.get("tool_calls")
 
@@ -221,8 +235,8 @@ class AgentLoop:
                     args = self._parser_arguments(brut)
                 except (json.JSONDecodeError, ValueError) as exc:
                     resultat = (
-                        f"Erreur : arguments JSON invalides pour '{nom}' "
-                        f"({exc}). Arguments recus : {brut}"
+                        f"Error: invalid JSON arguments for '{nom}' "
+                        f"({exc}). Received arguments: {brut}"
                     )
                 else:
                     resultat = tools.executer_outil(nom, args, self.config)
@@ -235,15 +249,15 @@ class AgentLoop:
                 self.historique.append(
                     {
                         "role": "user",
-                        "content": f"[Resultat de l'outil {nom}]\n{resultat}",
+                        "content": f"[Tool result: {nom}]\n{resultat}",
                     }
                 )
             # On reboucle : le modele voit les resultats et continue.
 
         # Securite : trop d'iterations d'affilee.
         message_limite = (
-            "[Limite atteinte : l'agent a utilise trop d'outils d'affilee "
-            "sans repondre. Reformulez votre demande.]"
+            "[Limit reached: the agent used too many tools in a row without "
+            "answering. Please rephrase your request.]"
         )
         self.historique.append({"role": "assistant", "content": message_limite})
         return message_limite

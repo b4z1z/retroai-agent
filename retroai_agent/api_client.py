@@ -97,32 +97,32 @@ class ApiClient:
                 )
             except requests.exceptions.Timeout as exc:
                 raise ApiError(
-                    f"Delai d'attente depasse ({TIMEOUT_REQUETE}s). "
-                    "Le serveur NVIDIA met trop de temps a repondre."
+                    f"Request timed out ({TIMEOUT_REQUETE}s). "
+                    "The NVIDIA server is taking too long to respond."
                 ) from exc
             except requests.exceptions.RequestException as exc:
-                raise ApiError(f"Erreur reseau : {exc}") from exc
+                raise ApiError(f"Network error: {exc}") from exc
 
             # --- Cas 429 : Rate Limit -> on attend puis on reessaie ------
             if reponse.status_code == 429:
                 if tentative < len(BACKOFF_DELAIS):
                     delai = BACKOFF_DELAIS[tentative]
                     print(
-                        f"  [API] Limite de debit atteinte (429). "
-                        f"Nouvelle tentative dans {delai}s..."
+                        f"  [API] Rate limit reached (429). "
+                        f"Retrying in {delai}s..."
                     )
                     time.sleep(delai)
                     continue  # on retente la boucle
                 raise ApiError(
-                    "Limite de debit (429) toujours active apres "
-                    f"{len(BACKOFF_DELAIS)} reessais. Abandon."
+                    "Rate limit (429) still active after "
+                    f"{len(BACKOFF_DELAIS)} retries. Giving up."
                 )
 
             # --- Autres erreurs HTTP : pas recuperables ------------------
             if reponse.status_code != 200:
                 extrait = reponse.text[:500]
                 raise ApiError(
-                    f"Erreur HTTP {reponse.status_code} de l'API NVIDIA :\n"
+                    f"HTTP error {reponse.status_code} from the NVIDIA API:\n"
                     f"{extrait}"
                 )
 
@@ -131,8 +131,8 @@ class ApiClient:
                 return reponse.json()
             except ValueError as exc:
                 raise ApiError(
-                    "Reponse de l'API illisible (JSON invalide)."
+                    "Unreadable API response (invalid JSON)."
                 ) from exc
 
         # Ne devrait jamais arriver, mais par securite :
-        raise ApiError("Echec inattendu de l'appel API.")
+        raise ApiError("Unexpected API call failure.")

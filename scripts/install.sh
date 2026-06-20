@@ -25,6 +25,8 @@ if command -v apt-get >/dev/null 2>&1; then
     command -v git     >/dev/null 2>&1 || BESOINS="$BESOINS git"
     command -v python3 >/dev/null 2>&1 || BESOINS="$BESOINS python3"
     command -v pipx    >/dev/null 2>&1 || BESOINS="$BESOINS pipx"
+    # python3-tk : fenetre de selection de fichier pour la commande /add-image.
+    python3 -c "import tkinter" >/dev/null 2>&1 || BESOINS="$BESOINS python3-tk"
     if [ -n "$BESOINS" ]; then
         echo "==> Installation des prerequis :$BESOINS"
         sudo apt-get update

@@ -110,17 +110,17 @@ def banniere(modele: str) -> None:
     if RICH_DISPO:
         contenu = Text(justify="center")
         contenu.append(LOGO + "\n\n", style=f"bold {ACCENT}")
-        contenu.append("Agent autonome CLI  ·  NVIDIA NIM\n", style="default")
-        contenu.append(f"Modele : {modele}\n", style=DIM)
+        contenu.append("Autonomous CLI agent  ·  NVIDIA NIM\n", style="default")
+        contenu.append(f"Model: {modele}\n", style=DIM)
         contenu.append("made by B4Z1Z · github.com/b4z1z\n\n", style=DIM)
         contenu.append("/help", style=f"bold {ACCENT}")
-        contenu.append(" aide     ", style=DIM)
+        contenu.append(" help     ", style=DIM)
         contenu.append("/continue", style=f"bold {ACCENT}")
-        contenu.append(" reprendre     ", style=DIM)
+        contenu.append(" resume     ", style=DIM)
         contenu.append("/reset", style=f"bold {ACCENT}")
-        contenu.append(" effacer     ", style=DIM)
+        contenu.append(" clear     ", style=DIM)
         contenu.append("/exit", style=f"bold {ACCENT}")
-        contenu.append(" quitter", style=DIM)
+        contenu.append(" quit", style=DIM)
         _console.print()
         _console.print(
             Panel(contenu, border_style=ACCENT, padding=(2, 4), expand=True)
@@ -128,10 +128,10 @@ def banniere(modele: str) -> None:
         _console.print()
     else:
         print("=" * 70)
-        print("   BAZIZ.IA  -  client CLI pour agent autonome (NIM)")
+        print("   BAZIZ.IA  -  lightweight CLI client for an autonomous agent (NIM)")
         print("   made by B4Z1Z · github.com/b4z1z")
-        print(f"   Modele : {modele}")
-        print("   /help aide · /continue reprendre · /reset effacer · /exit quitter")
+        print(f"   Model: {modele}")
+        print("   Commands: /help  /continue  /reset  /exit")
         print("=" * 70)
 
 
@@ -139,12 +139,12 @@ def banniere(modele: str) -> None:
 # Chaque glyphe = 5 lignes de 5 colonnes, pour un rendu "gros caracteres".
 _FONT_ADIEU = {
     "A": [" ███ ", "█   █", "█████", "█   █", "█   █"],
-    "U": ["█   █", "█   █", "█   █", "█   █", " ███ "],
-    "R": ["████ ", "█   █", "████ ", "█  █ ", "█   █"],
+    "B": ["████ ", "█   █", "████ ", "█   █", "████ "],
+    "D": ["████ ", "█   █", "█   █", "█   █", "████ "],
     "E": ["█████", "█    ", "████ ", "█    ", "█████"],
-    "V": ["█   █", "█   █", "█   █", " █ █ ", "  █  "],
+    "G": [" ███ ", "█    ", "█  ██", "█   █", " ███ "],
     "O": [" ███ ", "█   █", "█   █", "█   █", " ███ "],
-    "I": ["█████", "  █  ", "  █  ", "  █  ", "█████"],
+    "Y": ["█   █", " █ █ ", "  █  ", "  █  ", "  █  "],
     " ": ["     ", "     ", "     ", "     ", "     "],
 }
 
@@ -160,8 +160,8 @@ def _texte_pixel(texte: str) -> str:
 
 
 def au_revoir() -> None:
-    """Affiche un grand 'AU REVOIR' facon logo, centre, pour dire au revoir."""
-    art = _texte_pixel("AU REVOIR")
+    """Affiche un grand 'GOODBYE' facon logo, centre, pour dire au revoir."""
+    art = _texte_pixel("GOODBYE")
     lignes = art.split("\n")
     if RICH_DISPO:
         largeur = max(20, _console.size.width)
@@ -180,9 +180,9 @@ def saluer(pseudo: str) -> None:
     if not pseudo:
         return
     if RICH_DISPO:
-        _console.print(f"[{DIM}]Ravi de te retrouver,[/] [bold {ACCENT}]{pseudo}[/] !")
+        _console.print(f"[{DIM}]Welcome back,[/] [bold {ACCENT}]{pseudo}[/]!")
     else:
-        print(f"  Ravi de te retrouver, {pseudo} !")
+        print(f"  Welcome back, {pseudo}!")
 
 
 # --------------------------------------------------------------------------- #
@@ -199,7 +199,7 @@ def lire_saisie() -> str:
     """
     # Haut du cadre (commun a tous les modes).
     largeur = max(20, _console.size.width) if RICH_DISPO else 80
-    haut = "╭─ Vous " + "─" * max(0, largeur - 8)
+    haut = "╭─ You " + "─" * max(0, largeur - 7)
     if RICH_DISPO:
         _console.print()
         _console.print(haut, style=ACCENT)
@@ -232,7 +232,7 @@ def lire_saisie() -> str:
 def reponse_agent(texte: str) -> None:
     """Affiche la reponse de l'agent (rendue en Markdown si rich dispo)."""
     if not texte:
-        texte = "_(reponse vide)_"
+        texte = "_(empty response)_"
     if RICH_DISPO:
         _console.print()                       # ligne vide avant
         _console.print(f"[bold {ACCENT}]⏺ BAZIZ.IA[/]")
@@ -269,6 +269,34 @@ def erreur(texte: str) -> None:
         print(f"  [Erreur] {texte}")
 
 
+def demander_texte(invite: str) -> str:
+    """Pose une question texte simple (sans cadre ni auto-completion)."""
+    if RICH_DISPO:
+        return _console.input(f"[bold {ACCENT}]{invite}[/] ").strip()
+    return input(f"  {invite} ").strip()
+
+
+def image_jointe(nom: str) -> None:
+    """Confirme visuellement qu'une image a ete jointe au message."""
+    if RICH_DISPO:
+        _console.print(f"[{ACCENT}]🖼[/]  [{DIM}]image attached: {nom}[/]")
+    else:
+        print(f"  [image attached: {nom}]")
+
+
+def stop_reflexion() -> None:
+    """Message affiche quand l'utilisateur stoppe l'agent avec Ctrl+C."""
+    if RICH_DISPO:
+        _console.print()
+        _console.print(f"[bold {ACCENT}]⏹ Stopped.[/]")
+        _console.print(
+            f"[{DIM}]Type [/][bold {ACCENT}]/continue[/]"
+            f"[{DIM}] to resume where it stopped.[/]"
+        )
+    else:
+        print("\n  [Stopped. Type /continue to resume.]")
+
+
 def action_outil(nom: str, detail: str = "") -> None:
     """Affiche l'action d'un outil facon Claude Code : ⏺ nom (detail)."""
     if RICH_DISPO:
@@ -281,7 +309,7 @@ def action_outil(nom: str, detail: str = "") -> None:
         _console.print(ligne)
     else:
         suffixe = f" : {detail}" if detail else ""
-        print(f"\n  [OUTIL] {nom}{suffixe}")
+        print(f"\n  [TOOL] {nom}{suffixe}")
 
 
 def resultat_outil(resultat: str, max_lignes: int = 4) -> None:
@@ -302,27 +330,28 @@ def resultat_outil(resultat: str, max_lignes: int = 4) -> None:
                 Text(prefixe + ligne, style=DIM), markup=False, highlight=False
             )
         if reste > 0:
-            _console.print(Text(f"    … (+{reste} lignes)", style=DIM))
+            _console.print(Text(f"    … (+{reste} lines)", style=DIM))
     else:
         for i, ligne in enumerate(apercu):
             prefixe = "  |_ " if i == 0 else "     "
             print(f"{prefixe}{ligne}")
         if reste > 0:
-            print(f"     ... (+{reste} lignes)")
+            print(f"     ... (+{reste} lines)")
 
 
 @contextlib.contextmanager
-def reflexion(message: str = "Reflexion en cours…"):
+def reflexion(message: str = "Thinking…"):
     """
     Indicateur d'attente pendant un appel API. Spinner anime si rich dispo,
-    sinon simple ligne de texte. A utiliser autour de l'appel reseau SEUL
-    (jamais autour d'une saisie input()).
+    sinon simple ligne de texte. Affiche l'astuce "(Ctrl+C to stop)".
+    A utiliser autour de l'appel reseau SEUL (jamais autour d'un input()).
     """
     if RICH_DISPO:
-        with _console.status(f"[{ACCENT}]{message}[/]", spinner="dots"):
+        texte = f"[{ACCENT}]{message}[/] [{DIM}](Ctrl+C to stop)[/]"
+        with _console.status(texte, spinner="dots"):
             yield
     else:
-        print("  L'agent reflechit...", flush=True)
+        print(f"  {message} (Ctrl+C to stop)", flush=True)
         yield
 
 
@@ -332,10 +361,12 @@ def reflexion(message: str = "Reflexion en cours…"):
 # Source UNIQUE des commandes : utilisee par aide(), l'export texte et le
 # handler "/" de main.py. Modifier ici suffit a tout mettre a jour.
 COMMANDES = [
-    ("/help", "Affiche cette aide"),
-    ("/continue", "Reprend une tache interrompue / la session precedente"),
-    ("/reset", "Vide l'historique de la conversation"),
-    ("/exit, /quit", "Quitte le programme"),
+    ("/help", "Show this help"),
+    ("/add-image", "Pick an image via a file dialog and send it"),
+    ("/paste", "Send the image from your clipboard"),
+    ("/continue", "Resume an interrupted task / previous session"),
+    ("/reset", "Clear the conversation history"),
+    ("/exit, /quit", "Quit the program"),
 ]
 
 
@@ -360,37 +391,37 @@ def suggestions(prefixe: str) -> None:
     if RICH_DISPO:
         if correspondances:
             ligne = Text()
-            ligne.append("Suggestions : ", style=DIM)
+            ligne.append("Suggestions: ", style=DIM)
             ligne.append("   ".join(correspondances), style=f"bold {ACCENT}")
             _console.print(ligne)
         else:
             _console.print(
-                f"[{DANGER}]Aucune commande ne correspond a « {prefixe} ».[/]"
+                f'[{DANGER}]No command matches "{prefixe}".[/]'
             )
     else:
         if correspondances:
-            print("  Suggestions : " + "   ".join(correspondances))
+            print("  Suggestions: " + "   ".join(correspondances))
         else:
-            print(f"  Aucune commande ne correspond a '{prefixe}'.")
+            print(f'  No command matches "{prefixe}".')
 
 
 def aide() -> None:
     """Affiche l'aide des commandes (depuis la source unique COMMANDES)."""
     if RICH_DISPO:
         contenu = Text()
-        contenu.append("Commandes disponibles\n\n", style=f"bold {ACCENT}")
+        contenu.append("Available commands\n\n", style=f"bold {ACCENT}")
         for cmd, desc in COMMANDES:
             contenu.append(f"  {cmd:14}", style=f"bold {ACCENT}")
             contenu.append(f"{desc}\n", style=DIM)
         contenu.append(
-            "\nSinon, tapez votre demande et appuyez sur Entree.", style=DIM
+            "\nOtherwise, type your request and press Enter.", style=DIM
         )
         _console.print(Panel(contenu, border_style=DIM, padding=(1, 4), expand=True))
     else:
-        print("\nCommandes disponibles :")
+        print("\nAvailable commands:")
         for cmd, desc in COMMANDES:
             print(f"  {cmd:14} {desc}")
-        print("Sinon, tapez votre demande et appuyez sur Entree.")
+        print("Otherwise, type your request and press Enter.")
 
 
 def exporter_commandes(chemin: str = "COMMANDES.txt") -> None:
@@ -400,18 +431,18 @@ def exporter_commandes(chemin: str = "COMMANDES.txt") -> None:
     """
     lignes = [
         "============================================================",
-        "  BAZIZ.IA - Liste des commandes de l'interface",
+        "  BAZIZ.IA - Interface commands",
         "============================================================",
         "",
-        "Tapez l'une de ces commandes a l'invite, ou '/' pour afficher",
-        "cette liste directement dans le terminal.",
+        "Type one of these commands at the prompt, or '/' to show",
+        "this list directly in the terminal.",
         "",
     ]
     for cmd, desc in COMMANDES:
         lignes.append(f"  {cmd:14} {desc}")
     lignes += [
         "",
-        "Tout autre texte saisi est envoye comme message a l'agent.",
+        "Any other text is sent as a message to the agent.",
         "",
     ]
     try:
@@ -431,7 +462,7 @@ def panneau_confirmation(titre: str, details: str, dangereux: bool = False) -> N
         contenu = Text()
         contenu.append(f"{titre}\n\n", style=f"bold {couleur}")
         contenu.append(details, style="default")
-        titre_panneau = "⚠  ACTION DANGEREUSE" if dangereux else "Confirmation requise"
+        titre_panneau = "⚠  DANGEROUS ACTION" if dangereux else "Confirmation required"
         _console.print()
         _console.print(
             Panel(
@@ -445,16 +476,16 @@ def panneau_confirmation(titre: str, details: str, dangereux: bool = False) -> N
     else:
         print()
         print("  +-----------------------------------------------------------+")
-        marque = "ACTION DANGEREUSE" if dangereux else "CONFIRMATION REQUISE"
+        marque = "DANGEROUS ACTION" if dangereux else "CONFIRMATION REQUIRED"
         print(f"  |  {marque}")
         print("  +-----------------------------------------------------------+")
-        print(f"  Action : {titre}")
+        print(f"  Action: {titre}")
         for ligne in details.splitlines():
             print(f"    {ligne}")
         print()
 
 
-def lire_oui_non(invite: str = "Confirmer ?") -> str:
+def lire_oui_non(invite: str = "Confirm?") -> str:
     """Lit une reponse de confirmation (retourne la chaine brute, minuscules)."""
     if RICH_DISPO:
         return _console.input(

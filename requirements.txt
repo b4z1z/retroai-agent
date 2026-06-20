@@ -9,3 +9,7 @@ rich>=13.0.0
 # Auto-completion EN DIRECT des commandes (tape "/"), Windows + Linux.
 # Optionnel : sans lui, suggestions apres Entree uniquement (voir ui.py).
 prompt_toolkit>=3.0.0
+
+# Lecture d'image depuis le presse-papiers (commande /paste).
+# Optionnel : sans lui, /paste affiche un message d'erreur clair.
+pillow>=9.0.0

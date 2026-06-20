@@ -125,24 +125,24 @@ def _outil_read_file(args: dict, config: Config) -> str:
     ui.action_outil("read_file", path)
 
     if not path:
-        return "Erreur : aucun chemin fourni."
+        return "Error: no path provided."
     if not os.path.exists(path):
-        return f"Erreur : fichier introuvable -> {path}"
+        return f"Error: file not found -> {path}"
     if os.path.isdir(path):
-        return f"Erreur : '{path}' est un dossier, pas un fichier."
+        return f"Error: '{path}' is a directory, not a file."
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             contenu = f.read()
     except UnicodeDecodeError:
-        return f"Erreur : '{path}' semble etre un fichier binaire (illisible en texte)."
+        return f"Error: '{path}' looks like a binary file (not readable as text)."
     except OSError as exc:
-        return f"Erreur de lecture : {exc}"
+        return f"Read error: {exc}"
 
     if len(contenu) > MAX_CHARS_LECTURE:
         contenu = (
             contenu[:MAX_CHARS_LECTURE]
-            + f"\n\n[... tronque : fichier > {MAX_CHARS_LECTURE} caracteres ...]"
+            + f"\n\n[... truncated: file > {MAX_CHARS_LECTURE} characters ...]"
         )
     return contenu
 
@@ -153,27 +153,27 @@ def _outil_write_file(args: dict, config: Config) -> str:
     ui.action_outil("write_file", path)
 
     if not path:
-        return "Erreur : aucun chemin fourni."
+        return "Error: no path provided."
 
     # Apercu pour que l'utilisateur sache ce qu'il valide.
     apercu = content[:300] + ("..." if len(content) > 300 else "")
     details = (
-        f"Fichier : {path}\n"
-        f"Taille  : {len(content)} caracteres\n"
-        f"Apercu  :\n{apercu}"
+        f"File:    {path}\n"
+        f"Size:    {len(content)} characters\n"
+        f"Preview:\n{apercu}"
     )
 
     # CONFIRMATION OBLIGATOIRE (risque eleve).
-    if not safety.demander_confirmation("Ecrire un fichier", details):
-        return "Action annulee par l'utilisateur (write_file refuse)."
+    if not safety.demander_confirmation("Write a file", details):
+        return "Action cancelled by the user (write_file refused)."
 
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
     except OSError as exc:
-        return f"Erreur d'ecriture : {exc}"
+        return f"Write error: {exc}"
 
-    return f"Fichier ecrit avec succes : {path} ({len(content)} caracteres)."
+    return f"File written successfully: {path} ({len(content)} characters)."
 
 
 def _outil_list_directory(args: dict, config: Config) -> str:
@@ -181,19 +181,19 @@ def _outil_list_directory(args: dict, config: Config) -> str:
     ui.action_outil("list_directory", path)
 
     if not os.path.exists(path):
-        return f"Erreur : repertoire introuvable -> {path}"
+        return f"Error: directory not found -> {path}"
     if not os.path.isdir(path):
-        return f"Erreur : '{path}' n'est pas un repertoire."
+        return f"Error: '{path}' is not a directory."
 
     try:
         entrees = sorted(os.listdir(path))
     except OSError as exc:
-        return f"Erreur de lecture du repertoire : {exc}"
+        return f"Directory read error: {exc}"
 
     if not entrees:
-        return f"(Repertoire vide : {path})"
+        return f"(Empty directory: {path})"
 
-    lignes = [f"Contenu de {path} :"]
+    lignes = [f"Contents of {path}:"]
     for nom in entrees:
         chemin = os.path.join(path, nom)
         if os.path.isdir(chemin):
@@ -203,7 +203,7 @@ def _outil_list_directory(args: dict, config: Config) -> str:
                 taille = os.path.getsize(chemin)
             except OSError:
                 taille = 0
-            lignes.append(f"  [FILE] {nom}  ({taille} octets)")
+            lignes.append(f"  [FILE] {nom}  ({taille} bytes)")
     return "\n".join(lignes)
 
 
@@ -212,19 +212,26 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
     ui.action_outil("run_shell_command", command)
 
     if not command:
-        return "Erreur : aucune commande fournie."
+        return "Error: no command provided."
 
     # Avertissement renforce si la commande matche un motif dangereux.
     danger = safety.detecter_danger(command)
-    details = f"Commande : {command}"
-    if danger:
-        details += f"\n!! ATTENTION : {danger} !!"
 
-    # CONFIRMATION OBLIGATOIRE dans 100% des cas (risque eleve).
-    if not safety.demander_confirmation(
-        "Executer une commande shell", details, dangereux=bool(danger)
-    ):
-        return "Action annulee par l'utilisateur (commande refusee)."
+    # Option opt-in : auto-execute les commandes LECTURE SEULE sures, sans
+    # confirmation. Par defaut desactive -> tout est confirme (ultra-securise).
+    auto = config.auto_safe_commands and safety.est_commande_sure(command)
+
+    if auto:
+        ui.info("(safe read-only command — running without confirmation)")
+    else:
+        # CONFIRMATION OBLIGATOIRE (risque eleve / option desactivee).
+        details = f"Command: {command}"
+        if danger:
+            details += f"\n!! WARNING: {danger} !!"
+        if not safety.demander_confirmation(
+            "Run a shell command", details, dangereux=bool(danger)
+        ):
+            return "Action cancelled by the user (command refused)."
 
     try:
         resultat = subprocess.run(
@@ -235,16 +242,16 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
             timeout=config.shell_timeout,
         )
     except subprocess.TimeoutExpired:
-        return f"Erreur : commande interrompue (timeout {config.shell_timeout}s depasse)."
+        return f"Error: command interrupted (timeout {config.shell_timeout}s exceeded)."
     except OSError as exc:
-        return f"Erreur d'execution : {exc}"
+        return f"Execution error: {exc}"
 
     sortie = []
     if resultat.stdout:
         sortie.append("[stdout]\n" + resultat.stdout)
     if resultat.stderr:
         sortie.append("[stderr]\n" + resultat.stderr)
-    sortie.append(f"[code de sortie] {resultat.returncode}")
+    sortie.append(f"[exit code] {resultat.returncode}")
     return "\n".join(sortie)
 
 
@@ -266,5 +273,5 @@ def executer_outil(nom: str, args: dict, config: Config) -> str:
     """
     fonction = TOOLS.get(nom)
     if fonction is None:
-        return f"Erreur : outil inconnu '{nom}'."
+        return f"Error: unknown tool '{nom}'."
     return fonction(args, config)
