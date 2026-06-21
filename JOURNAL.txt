@@ -1399,3 +1399,54 @@ ETAT : CODE TERMINE, A VALIDER EN REEL.
   AJOUT : apres generation, l'image s'ouvre automatiquement dans la
   visionneuse par defaut (image_gen.ouvrir_image : os.startfile / open /
   xdg-open selon l'OS ; echec silencieux -> message si non ouvrable).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Multi-fournisseurs images + menu /image (FLUX / Nano Banana)
+----------------------------------------------------------------
+OBJECTIF :
+  Permettre de generer avec Nano Banana (Gemini) en plus de FLUX, sans
+  laisser de cle dans le repo open source : chaque utilisateur saisit SA
+  cle in-app (ecrite dans .env gitignore). FLUX reste le defaut (out of the box).
+
+DESIGN UX (decide avec l'utilisateur) :
+  - On GARDE /create-image, /add-image, /paste tels quels.
+  - /image = panneau de REGLAGE du modele de generation (n'affiche/genere rien) :
+    montre le modele courant + les commandes + 3 options (1 FLUX, 2 Nano Banana
+    Pro, 3 Nano Banana Flash). Enter = garder.
+  - Choisir Gemini sans cle -> l'app demande la cle UNE fois et l'ecrit dans
+    .env (set_env_value). Sessions suivantes : memorise. Pas d'edition manuelle.
+  - Pas d'OAuth (trop lourd + pas gratuit + client_id dans le repo) : la cle
+    API EST la "connexion" au compte Google (generee sur aistudio.google.com).
+
+FICHIERS MODIFIES / CREES :
+  - config.py : champs image_provider/gemini_api_key/gemini_model + lecture env
+    (IMAGE_PROVIDER/GEMINI_API_KEY/GEMINI_MODEL). NOUVEAU set_env_value(nom,
+    valeur) : cree/MAJ une ligne dans .env + os.environ (preserve commentaires).
+  - image_gen.py : label_modele() ; _generer_gemini() (endpoint generateContent,
+    header x-goog-api-key, responseModalities TEXT+IMAGE) ; _extraire_gemini_
+    base64() (parts[].inlineData.data) ; creer_image() aiguille selon provider.
+  - main.py : commande /image -> _menu_image() (affiche + change le modele,
+    demande/sauve la cle Gemini si besoin). Pro=gemini-3-pro-image,
+    Flash=gemini-2.5-flash-image.
+  - ui.py : /image dans COMMANDES ; menu_image(courant, gemini_pret).
+  - .env.example : IMAGE_PROVIDER + GEMINI_API_KEY (commente) + GEMINI_MODEL.
+
+VERIF :
+  - extraction Gemini OK (+ cas vide) ; labels OK ; sans cle -> ApiError clair ;
+    set_env_value cree ET met a jour sans dupliquer ; /image dans le menu ;
+    15 tests pytest OK.
+
+A TESTER EN REEL :
+  - /create-image avec FLUX (NVIDIA) ; puis /image -> 2 (saisir cle Gemini) ->
+    /create-image avec Nano Banana. (format requete/reponse Gemini reconstitue
+    depuis la doc ; extraction tolerante.)
+
+ETAT : CODE TERMINE, A VALIDER EN REEL.
+
+  AJOUT : gestion fin de palier gratuit Gemini. _generer_gemini() leve
+  QuotaError (sous-classe ApiError) sur HTTP 429. main._gerer_quota affiche
+  ui.quota_atteint() (panneau : switch FLUX / attendre reset / upgrade key)
+  puis propose "Switch to FLUX (free) and retry now? (y/n)" -> bascule
+  IMAGE_PROVIDER=nvidia (persiste .env) et regenere aussitot. Refus -> astuce
+  (quota reset quotidien, /image pour changer).

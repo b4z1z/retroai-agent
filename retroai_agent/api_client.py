@@ -33,6 +33,14 @@ class ApiError(Exception):
     """Erreur levee quand l'appel API echoue de maniere non recuperable."""
 
 
+class QuotaError(ApiError):
+    """
+    Quota / palier gratuit epuise (HTTP 429 RESOURCE_EXHAUSTED).
+    Sous-classe d'ApiError -> les 'except ApiError' existants la capturent
+    aussi, mais l'appelant peut la traiter specifiquement (proposer FLUX...).
+    """
+
+
 def _extraire_image_base64(data: dict) -> str:
     """
     Extrait la chaine base64 de l'image depuis la reponse de l'API genai.

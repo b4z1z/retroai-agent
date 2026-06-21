@@ -17,12 +17,74 @@ import subprocess
 import sys
 import time
 
-from .api_client import ApiClient, ApiError
+import requests
+
+from .api_client import ApiClient, ApiError, QuotaError
 from .config import Config
 
 
 # Dossier ou sont enregistrees les images generees (ignore par git).
 DOSSIER_IMAGES = "generated_images"
+
+# Endpoint Google Gemini (Nano Banana) pour la generation d'images.
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+)
+
+
+def label_modele(config: Config) -> str:
+    """Libelle lisible du modele de generation courant (pour l'affichage)."""
+    if config.image_provider == "gemini":
+        return f"Nano Banana ({config.gemini_model}) · Google"
+    return f"FLUX.1 ({config.image_model}) · NVIDIA"
+
+
+def _extraire_gemini_base64(data: dict) -> str:
+    """Extrait l'image base64 de la reponse Gemini (parts[].inlineData.data)."""
+    for candidat in data.get("candidates") or []:
+        parts = (candidat.get("content") or {}).get("parts") or []
+        for part in parts:
+            inline = part.get("inlineData") or part.get("inline_data")
+            if inline and inline.get("data"):
+                return inline["data"]
+    raise ApiError("The Gemini response did not contain any image.")
+
+
+def _generer_gemini(config: Config, prompt: str) -> str:
+    """Genere une image via l'API Gemini et retourne sa donnee base64."""
+    if not config.gemini_api_key:
+        raise ApiError(
+            "No Gemini API key set. Use /image to choose a Gemini model "
+            "and enter your key."
+        )
+    url = GEMINI_URL.format(model=config.gemini_model)
+    headers = {
+        "x-goog-api-key": config.gemini_api_key,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+    }
+    try:
+        reponse = requests.post(url, headers=headers, json=payload, timeout=120)
+    except requests.exceptions.RequestException as exc:
+        raise ApiError(f"Network error (Gemini): {exc}") from exc
+
+    # 429 = quota / palier gratuit epuise (ou rate limit) -> erreur dediee.
+    if reponse.status_code == 429:
+        raise QuotaError(
+            "Gemini free-tier limit reached (quota exhausted, HTTP 429)."
+        )
+    if reponse.status_code != 200:
+        raise ApiError(
+            f"HTTP error {reponse.status_code} from Gemini:\n{reponse.text[:500]}"
+        )
+    try:
+        data = reponse.json()
+    except ValueError as exc:
+        raise ApiError("Unreadable Gemini response (invalid JSON).") from exc
+    return _extraire_gemini_base64(data)
 
 
 def _nettoyer_base64(b64: str) -> str:
@@ -35,9 +97,14 @@ def _nettoyer_base64(b64: str) -> str:
 def creer_image(client: ApiClient, config: Config, description: str) -> str:
     """
     Genere une image depuis 'description', l'enregistre en PNG et retourne
-    le chemin du fichier. Leve ApiError si la generation ou l'ecriture echoue.
+    le chemin du fichier. Selon config.image_provider, utilise FLUX (NVIDIA)
+    ou Nano Banana (Gemini). Leve ApiError si la generation/ecriture echoue.
     """
-    b64 = _nettoyer_base64(client.generer_image(description))
+    if config.image_provider == "gemini":
+        brut = _generer_gemini(config, description)
+    else:
+        brut = client.generer_image(description)
+    b64 = _nettoyer_base64(brut)
 
     try:
         donnees = base64.b64decode(b64)

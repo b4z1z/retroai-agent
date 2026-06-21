@@ -284,6 +284,65 @@ def image_jointe(nom: str) -> None:
         print(f"  [image attached: {nom}]")
 
 
+def menu_image(courant: str, gemini_pret: bool) -> None:
+    """
+    Affiche le panneau /image : modele courant, commandes image, et options
+    pour changer de modele de generation. 'gemini_pret' indique si une cle
+    Gemini est deja enregistree (sinon on signale qu'elle sera demandee).
+    """
+    note_gemini = "" if gemini_pret else "  (a Google API key will be asked once)"
+    if RICH_DISPO:
+        t = Text()
+        t.append("Image generation\n\n", style=f"bold {ACCENT}")
+        t.append("Current model: ", style=DIM)
+        t.append(courant + "\n\n", style="bold")
+        t.append("Commands:\n", style=DIM)
+        t.append("  /create-image", style=f"bold {ACCENT}")
+        t.append("  generate from text\n", style=DIM)
+        t.append("  /add-image", style=f"bold {ACCENT}")
+        t.append("     send an image from a file\n", style=DIM)
+        t.append("  /paste", style=f"bold {ACCENT}")
+        t.append("         send an image from clipboard\n\n", style=DIM)
+        t.append("Change generation model:\n", style=DIM)
+        t.append("  1) FLUX.1            ", style=f"bold {ACCENT}")
+        t.append("NVIDIA · free · default\n", style=DIM)
+        t.append("  2) Nano Banana Pro   ", style=f"bold {ACCENT}")
+        t.append(f"Google · best quality{note_gemini}\n", style=DIM)
+        t.append("  3) Nano Banana Flash ", style=f"bold {ACCENT}")
+        t.append(f"Google · faster{note_gemini}\n", style=DIM)
+        _console.print()
+        _console.print(Panel(t, border_style=ACCENT, padding=(1, 4), expand=True))
+    else:
+        print("\nImage generation")
+        print(f"  Current model: {courant}")
+        print("  Commands: /create-image  /add-image  /paste")
+        print("  Change model:")
+        print("    1) FLUX.1            NVIDIA · free · default")
+        print(f"    2) Nano Banana Pro   Google · best quality{note_gemini}")
+        print(f"    3) Nano Banana Flash Google · faster{note_gemini}")
+
+
+def quota_atteint() -> None:
+    """Avertit que le palier gratuit Gemini est epuise et liste les options."""
+    if RICH_DISPO:
+        t = Text()
+        t.append("Gemini free-tier limit reached\n\n", style=f"bold {DANGER}")
+        t.append("Your daily free quota for Nano Banana is exhausted.\n\n",
+                 style="default")
+        t.append("Options:\n", style=DIM)
+        t.append("  • Switch to FLUX (free) and keep generating\n", style=DIM)
+        t.append("  • Wait — the free quota resets daily\n", style=DIM)
+        t.append("  • Use an upgraded / paid Google API key\n", style=DIM)
+        _console.print()
+        _console.print(
+            Panel(t, title="⚠  Quota reached", border_style=DANGER,
+                  padding=(1, 4), expand=True)
+        )
+    else:
+        print("\n  [Gemini free-tier limit reached]")
+        print("  Options: switch to FLUX (free) · wait (resets daily) · upgrade key")
+
+
 def image_creee(chemin: str) -> None:
     """Confirme qu'une image a ete generee et indique ou elle est enregistree."""
     if RICH_DISPO:
@@ -371,6 +430,7 @@ def reflexion(message: str = "Thinking…"):
 # handler "/" de main.py. Modifier ici suffit a tout mettre a jour.
 COMMANDES = [
     ("/help", "Show this help"),
+    ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/paste", "Send the image from your clipboard"),
     ("/create-image", "Generate an image from a text description"),

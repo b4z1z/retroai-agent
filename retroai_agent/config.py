@@ -34,6 +34,13 @@ class Config:
     # generation (FLUX) sur l'endpoint genai de NVIDIA, avec la MEME cle API.
     image_base_url: str = "https://ai.api.nvidia.com/v1/genai"
     image_model: str = "black-forest-labs/flux.1-dev"
+    # Fournisseur de generation d'images : "nvidia" (FLUX, defaut) ou "gemini"
+    # (Nano Banana). Le menu /image permet de basculer en direct.
+    image_provider: str = "nvidia"
+    # Cle + modele Google Gemini (optionnels). Renseignes via /image (saisie
+    # in-app, ecrite dans .env) ou manuellement. Vides si non utilises.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3-pro-image"
 
 
 # --------------------------------------------------------------------------- #
@@ -131,4 +138,53 @@ def load_config(dotenv_path: str = ".env") -> Config:
             "IMAGE_BASE_URL", "https://ai.api.nvidia.com/v1/genai"
         ),
         image_model=os.environ.get("IMAGE_MODEL", "black-forest-labs/flux.1-dev"),
+        image_provider=os.environ.get("IMAGE_PROVIDER", "nvidia").strip().lower(),
+        gemini_api_key=os.environ.get("GEMINI_API_KEY", "").strip(),
+        gemini_model=os.environ.get("GEMINI_MODEL", "gemini-3-pro-image"),
     )
+
+
+# --------------------------------------------------------------------------- #
+#  5. Ecriture d'une variable dans .env (utilise par le menu /image)          #
+# --------------------------------------------------------------------------- #
+def set_env_value(nom: str, valeur: str, path: str = ".env") -> None:
+    """
+    Cree ou met a jour la ligne 'NOM=valeur' dans le fichier .env, ET dans
+    os.environ (effet immediat). Permet a l'app d'enregistrer la cle Gemini
+    ou le modele choisi sans que l'utilisateur edite le fichier a la main.
+    Les commentaires existants sont preserves. Echec silencieux si non ecrivable.
+    """
+    os.environ[nom] = valeur
+
+    lignes: list[str] = []
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                lignes = f.readlines()
+        except OSError:
+            lignes = []
+
+    nouvelle = f"{nom}={valeur}\n"
+    trouve = False
+    for i, ligne in enumerate(lignes):
+        sans_commentaire = ligne.strip()
+        if (
+            sans_commentaire
+            and not sans_commentaire.startswith("#")
+            and "=" in sans_commentaire
+            and sans_commentaire.split("=", 1)[0].strip() == nom
+        ):
+            lignes[i] = nouvelle
+            trouve = True
+            break
+
+    if not trouve:
+        if lignes and not lignes[-1].endswith("\n"):
+            lignes[-1] += "\n"
+        lignes.append(nouvelle)
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.writelines(lignes)
+    except OSError:
+        pass
