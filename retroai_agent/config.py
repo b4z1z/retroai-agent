@@ -29,6 +29,11 @@ class Config:
     enable_thinking: bool   # Mode raisonnement active ou non
     shell_timeout: int      # Delai max (s) pour une commande shell
     auto_safe_commands: bool  # Auto-execute les commandes shell sures (opt-in)
+    # Generation d'images (commande /create-image). Modele distinct du modele
+    # de chat : kimi-k2.6 ne SAIT PAS creer d'images. On utilise un modele de
+    # generation (FLUX) sur l'endpoint genai de NVIDIA, avec la MEME cle API.
+    image_base_url: str = "https://ai.api.nvidia.com/v1/genai"
+    image_model: str = "black-forest-labs/flux.1-dev"
 
 
 # --------------------------------------------------------------------------- #
@@ -122,4 +127,8 @@ def load_config(dotenv_path: str = ".env") -> Config:
         enable_thinking=_env_bool("ENABLE_THINKING", True),
         shell_timeout=_env_int("SHELL_TIMEOUT", 30),
         auto_safe_commands=_env_bool("AUTO_SAFE_COMMANDS", False),
+        image_base_url=os.environ.get(
+            "IMAGE_BASE_URL", "https://ai.api.nvidia.com/v1/genai"
+        ),
+        image_model=os.environ.get("IMAGE_MODEL", "black-forest-labs/flux.1-dev"),
     )

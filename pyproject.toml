@@ -26,6 +26,10 @@ dependencies = [
     "pillow>=9.0.0",
 ]
 
+# Dependances de developpement (tests). Installer avec : pip install -e ".[dev]"
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
 # Le point d'entree : la commande "baziz.ia" appelle retroai_agent.main:main
 [project.scripts]
 "baziz.ia" = "retroai_agent.main:main"

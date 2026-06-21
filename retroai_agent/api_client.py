@@ -33,6 +33,31 @@ class ApiError(Exception):
     """Erreur levee quand l'appel API echoue de maniere non recuperable."""
 
 
+def _extraire_image_base64(data: dict) -> str:
+    """
+    Extrait la chaine base64 de l'image depuis la reponse de l'API genai.
+    Tolerant a plusieurs formats possibles (l'endpoint NVIDIA peut renvoyer
+    'artifacts', le style OpenAI 'data[].b64_json', ou un champ direct).
+    """
+    # Format NVIDIA genai (Stability/FLUX) : {"artifacts":[{"base64": "..."}]}
+    artifacts = data.get("artifacts")
+    if isinstance(artifacts, list) and artifacts:
+        b64 = artifacts[0].get("base64") or artifacts[0].get("b64_json")
+        if b64:
+            return b64
+    # Format style OpenAI : {"data":[{"b64_json": "..."}]}
+    bloc = data.get("data")
+    if isinstance(bloc, list) and bloc:
+        b64 = bloc[0].get("b64_json") or bloc[0].get("base64")
+        if b64:
+            return b64
+    # Champ direct eventuel.
+    for cle in ("image", "b64_json", "base64"):
+        if isinstance(data.get(cle), str):
+            return data[cle]
+    raise ApiError("The image API response did not contain any image data.")
+
+
 class ApiClient:
     """Client minimaliste pour l'endpoint chat/completions de NVIDIA NIM."""
 
@@ -136,3 +161,68 @@ class ApiClient:
 
         # Ne devrait jamais arriver, mais par securite :
         raise ApiError("Unexpected API call failure.")
+
+    # ------------------------------------------------------------------ #
+    #  Generation d'image (text-to-image) - endpoint genai (FLUX)        #
+    # ------------------------------------------------------------------ #
+    def generer_image(
+        self,
+        prompt: str,
+        *,
+        width: int = 1024,
+        height: int = 1024,
+        steps: int = 50,
+        cfg_scale: float = 3.5,
+        seed: int = 0,
+    ) -> str:
+        """
+        Genere une image a partir d'un prompt texte et retourne sa donnee
+        base64 (a decoder/sauver par l'appelant). Utilise le modele image de
+        la config (FLUX par defaut) sur l'endpoint genai, avec la meme cle API.
+
+        Gere le retry/backoff sur 429 comme chat(). Leve ApiError si echec.
+        """
+        url = f"{self.config.image_base_url.rstrip('/')}/{self.config.image_model}"
+        payload = {
+            "prompt": prompt,
+            "mode": "base",
+            "cfg_scale": cfg_scale,
+            "width": width,
+            "height": height,
+            "seed": seed,
+            "steps": steps,
+        }
+
+        for tentative in range(len(BACKOFF_DELAIS) + 1):
+            try:
+                reponse = self.session.post(
+                    url, json=payload, timeout=TIMEOUT_REQUETE
+                )
+            except requests.exceptions.Timeout as exc:
+                raise ApiError(
+                    f"Image request timed out ({TIMEOUT_REQUETE}s)."
+                ) from exc
+            except requests.exceptions.RequestException as exc:
+                raise ApiError(f"Network error: {exc}") from exc
+
+            if reponse.status_code == 429:
+                if tentative < len(BACKOFF_DELAIS):
+                    delai = BACKOFF_DELAIS[tentative]
+                    print(f"  [API] Rate limit (429). Retrying in {delai}s...")
+                    time.sleep(delai)
+                    continue
+                raise ApiError("Rate limit (429) still active. Giving up.")
+
+            if reponse.status_code != 200:
+                raise ApiError(
+                    f"HTTP error {reponse.status_code} from the image API:\n"
+                    f"{reponse.text[:500]}"
+                )
+
+            try:
+                data = reponse.json()
+            except ValueError as exc:
+                raise ApiError("Unreadable image API response (invalid JSON).") from exc
+            return _extraire_image_base64(data)
+
+        raise ApiError("Unexpected image API call failure.")

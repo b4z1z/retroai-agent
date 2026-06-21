@@ -941,7 +941,8 @@ IDEES FUTURES (a faire plus tard, pas aujourd'hui)
       horodatees, listables et selectionnables.
 - [ ] LICENSE (choix en attente : MIT ou Tous droits reserves).
 - [ ] Interrupteur de test des pannes API (simuler un echec a l'etape N).
-- [ ] Tests automatises (pytest).
+- [~] Tests automatises (pytest) : FAIT pour securite/config/images
+      (2026-06-19, 15 tests). Reste plus tard : ui, agent_loop, tools.
 
 
 ----------------------------------------------------------------
@@ -1273,3 +1274,128 @@ TESTS REALISES :
     redemande confirmation (garde-fou).                                OK
 
 ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-19] ETAPE - Tests automatises (pytest) : securite/config/images
+----------------------------------------------------------------
+OBJECTIF :
+  Poser un filet de securite (pytest) sur les parties STABLES + CRITIQUES,
+  conformement a l'approche hybride decidee (tester ce qui ne bouge plus
+  et ce qui est risque ; laisser le reste pour plus tard).
+
+FICHIERS CREES :
+  - tests/test_safety.py : detecter_danger (dangereuses/sures) + est_commande
+    _sure (liste blanche OK ; pieges > | ; && $() backtick / find -delete/
+    -exec / hors liste / vide -> bloques).
+  - tests/test_config.py : cle manquante -> SystemExit ; valeurs par defaut ;
+    conversion bool/int ; timeout invalide -> defaut. (monkeypatch + dotenv
+    inexistant pour ne pas lire le vrai .env.)
+  - tests/test_images.py : detection chemin ; ponctuation collee (bug du dev) ;
+    fichier inexistant ignore ; str sans image vs liste multimodale avec
+    image (vrai PNG cree via tmp_path).
+
+FICHIERS MODIFIES :
+  - pyproject.toml : [project.optional-dependencies] dev = ["pytest>=7.0"].
+  - .gitignore : .pytest_cache/.
+  - README.md : section "Tests" (pip install -e ".[dev]" ; pytest).
+
+LANCEMENT :
+  - pip install -e ".[dev]"  puis  pytest
+
+RESULTAT :
+  - 15 tests PASSED en 0.59s (Windows, pytest 9.1.1, Python 3.14).
+
+REMARQUE :
+  - Approche hybride : UI/agent_loop (encore mouvants) testes plus tard,
+    quand stabilises. La securite est verrouillee des maintenant.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Connaissance permanente du createur (BAZIZ / B4Z1Z)
+----------------------------------------------------------------
+OBJECTIF :
+  Que l'agent sache repondre a "qui est BAZIZ / B4Z1Z ?" (identite du
+  createur), distinct du profil optionnel de l'utilisateur courant.
+
+FICHIER MODIFIE :
+  - agent_loop.py : nouvelle constante A_PROPOS (bio createur : BAZIZ /
+    handle B4Z1Z / bazizdev07@gmail.com / repo github). Injectee dans
+    reset() : systeme = SYSTEME + A_PROPOS [+ infos_utilisateur].
+    Editable librement pour completer la bio.
+
+ETAT : TERMINEE.
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Polish images (3 ameliorations)
+----------------------------------------------------------------
+OBJECTIF :
+  Alleger et fiabiliser le support image.
+
+FICHIERS MODIFIES :
+  - images.py :
+    (1) URLs distantes http(s) : detectees dans le texte ET passees telles
+        quelles a l'API (encoder_image renvoie l'URL sans encoder).
+    (2) Reduction des grandes images via Pillow : si max dimension > 1568px,
+        thumbnail() puis re-encodage (JPEG q85, ou PNG si canal alpha).
+        Repli silencieux sur le fichier brut si Pillow absent/echec.
+        Filet MAX_OCTETS conserve avant ET apres reduction.
+    (3) alleger_pour_disque(historique) : remplace les data-URI base64 par
+        une note texte courte AVANT sauvegarde (URLs distantes conservees).
+        L'historique en memoire reste intact (image visible pendant la session).
+  - agent_loop.py : sauver_session() ecrit images.alleger_pour_disque(...)
+    -> session_history.json ne gonfle plus de plusieurs Mo.
+
+VERIF :
+  - URL pass-through + detection OK.
+  - alleger : base64 -> "[image omitted...]", URL distante gardee.
+  - reduction : 2000x2000 PNG -> 1568x1568 JPEG.
+  - 15 tests pytest toujours OK.
+
+ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Generation d'images : /create-image (FLUX via NIM)
+----------------------------------------------------------------
+OBJECTIF :
+  Creer des images depuis une description texte. IMPORTANT : kimi-k2.6 ne
+  GENERE pas d'images -> on utilise un modele SEPARE (FLUX.1-dev) sur
+  l'endpoint genai de NVIDIA, avec la MEME cle API NVIDIA_API_KEY.
+
+CHOIX : FLUX.1-dev par defaut (meilleure qualite), SWITCHABLE via .env
+  (IMAGE_MODEL=..., ex. stabilityai/sdxl-turbo pour du plus rapide).
+
+FICHIERS MODIFIES / CREES :
+  - config.py : champs image_base_url (defaut ai.api.nvidia.com/v1/genai) et
+    image_model (defaut black-forest-labs/flux.1-dev), lus depuis IMAGE_BASE_URL
+    / IMAGE_MODEL. Defauts dans la dataclass (n'impacte pas les tests).
+  - api_client.py : methode generer_image(prompt, width/height/steps/cfg/seed)
+    -> POST {image_base}/{model}, payload mode=base, retry/backoff 429 comme
+    chat(). Helper _extraire_image_base64() TOLERANT (artifacts[].base64 /
+    data[].b64_json / champ direct).
+  - image_gen.py (NOUVEAU) : creer_image() decode le base64 et enregistre un
+    PNG dans generated_images/ (nom horodate), retourne le chemin.
+  - main.py : commande /create-image -> demande la description -> spinner
+    "Generating image…" -> ui.image_creee(chemin). Ctrl+C = annule.
+  - ui.py : /create-image ajoute a COMMANDES (menu deroulant + COMMANDES.txt
+    auto) ; helper image_creee().
+  - .gitignore : generated_images/.
+  - .env.example : IMAGE_MODEL + IMAGE_BASE_URL documentes.
+
+VERIF :
+  - imports OK ; extraction base64 (3 formats + cas vide) OK ; defaut config
+    OK ; /create-image dans le menu OK ; 15 tests pytest OK.
+
+A TESTER EN REEL :
+  - L'appel a l'endpoint genai (format requete/reponse reconstitue depuis la
+    doc ; extraction tolerante au cas ou). -> lancer /create-image une fois.
+
+ETAT : CODE TERMINE, A VALIDER EN REEL.
+
+  AJOUT : apres generation, l'image s'ouvre automatiquement dans la
+  visionneuse par defaut (image_gen.ouvrir_image : os.startfile / open /
+  xdg-open selon l'OS ; echec silencieux -> message si non ouvrable).

@@ -8,6 +8,7 @@ this list directly in the terminal.
   /help          Show this help
   /add-image     Pick an image via a file dialog and send it
   /paste         Send the image from your clipboard
+  /create-image  Generate an image from a text description
   /continue      Resume an interrupted task / previous session
   /reset         Clear the conversation history
   /exit, /quit   Quit the program

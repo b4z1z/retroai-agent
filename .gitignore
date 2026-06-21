@@ -7,6 +7,9 @@ user_profile.json
 # Historique de conversation sauvegarde (pour /continue).
 session_history.json
 
+# Images generees par /create-image (sorties locales).
+generated_images/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -14,6 +17,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
 
 # Outils / IDE
 .vscode/

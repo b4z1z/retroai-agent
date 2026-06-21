@@ -284,6 +284,15 @@ def image_jointe(nom: str) -> None:
         print(f"  [image attached: {nom}]")
 
 
+def image_creee(chemin: str) -> None:
+    """Confirme qu'une image a ete generee et indique ou elle est enregistree."""
+    if RICH_DISPO:
+        _console.print()
+        _console.print(f"[{SUCCES}]🎨 Image generated[/] [{DIM}]→[/] [bold {ACCENT}]{chemin}[/]")
+    else:
+        print(f"\n  [Image generated: {chemin}]")
+
+
 def stop_reflexion() -> None:
     """Message affiche quand l'utilisateur stoppe l'agent avec Ctrl+C."""
     if RICH_DISPO:
@@ -364,6 +373,7 @@ COMMANDES = [
     ("/help", "Show this help"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/paste", "Send the image from your clipboard"),
+    ("/create-image", "Generate an image from a text description"),
     ("/continue", "Resume an interrupted task / previous session"),
     ("/reset", "Clear the conversation history"),
     ("/exit, /quit", "Quit the program"),

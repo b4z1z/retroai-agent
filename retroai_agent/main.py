@@ -22,6 +22,7 @@ from .agent_loop import AgentLoop
 from . import profile
 from . import ui
 from . import images
+from . import image_gen
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -79,6 +80,9 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             _envoyer_avec_image(agent, images.image_depuis_presse_papiers(),
                                 source="clipboard")
             continue
+        if saisie == "/create-image":
+            _creer_image(agent)
+            continue
         # Taper juste "/" (ou "/?") affiche la liste complete des commandes.
         if saisie in ("/", "/?"):
             ui.aide()
@@ -119,6 +123,34 @@ def _envoyer_avec_image(agent: AgentLoop, chemin, *, source: str) -> None:
     if not texte:
         texte = "Describe this image."
     _traiter_reponse(agent, saisie=texte, chemins_images=[chemin])
+
+
+def _creer_image(agent: AgentLoop) -> None:
+    """
+    Commande /create-image : demande une description puis genere une image
+    (modele FLUX via NIM) enregistree localement. Affiche le chemin du PNG.
+    """
+    try:
+        description = ui.demander_texte("Describe the image to generate:")
+    except (EOFError, KeyboardInterrupt):
+        ui.info("\nCancelled.")
+        return
+    if not description:
+        ui.info("Cancelled (empty description).")
+        return
+    try:
+        with ui.reflexion("Generating image…"):
+            chemin = image_gen.creer_image(agent.client, agent.config, description)
+    except ApiError as exc:
+        ui.erreur(str(exc))
+        return
+    except KeyboardInterrupt:
+        ui.info("\nCancelled.")
+        return
+    ui.image_creee(chemin)
+    # Ouvre l'image dans la visionneuse par defaut pour voir le resultat.
+    if not image_gen.ouvrir_image(chemin):
+        ui.info("(Could not open the image automatically — open it manually.)")
 
 
 def _traiter_reponse(agent: AgentLoop, *, saisie: str = "", reprise: bool = False,

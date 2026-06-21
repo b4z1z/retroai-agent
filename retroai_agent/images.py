@@ -31,6 +31,16 @@ MIME_PAR_EXTENSION = {
 # Garde-fou : on n'encode pas une image plus grosse que ca (octets).
 MAX_OCTETS = 8 * 1024 * 1024  # 8 Mo
 
+# Reduction des grandes images avant envoi : si la plus grande dimension
+# depasse cette valeur (pixels), on redimensionne (via Pillow si dispo).
+# Gain : moins de base64 -> messages plus legers, moins de tokens, plus rapide.
+MAX_DIMENSION = 1568
+
+
+def _est_url(token: str) -> bool:
+    """Vrai si le token est une URL d'image distante (http/https)."""
+    return token.startswith("http://") or token.startswith("https://")
+
 
 def _nettoyer(token: str) -> str:
     """
@@ -46,9 +56,9 @@ def _nettoyer(token: str) -> str:
 
 def extraire_chemins_images(texte: str) -> list[str]:
     """
-    Retourne la liste des chemins d'images EXISTANTS mentionnes dans le texte.
-    Un token est retenu s'il a une extension d'image connue ET pointe vers
-    un fichier reel (os.path.isfile).
+    Retourne la liste des images mentionnees dans le texte. On retient :
+      - les URLs http(s) avec une extension d'image connue ;
+      - les chemins locaux pointant vers un fichier reel (os.path.isfile).
     """
     chemins = []
     for token in texte.split():
@@ -56,26 +66,70 @@ def extraire_chemins_images(texte: str) -> list[str]:
         if not chemin:
             continue
         ext = os.path.splitext(chemin)[1].lower()
-        if ext in MIME_PAR_EXTENSION and os.path.isfile(chemin):
+        if ext not in MIME_PAR_EXTENSION:
+            continue
+        if _est_url(chemin) or os.path.isfile(chemin):
             chemins.append(chemin)
     return chemins
 
 
-def encoder_image(chemin: str) -> str | None:
+def _reduire_si_grande(chemin: str) -> tuple[bytes, str] | None:
     """
-    Lit une image et la retourne en data-URI base64, ou None si echec
-    (fichier illisible, trop gros...).
+    Si Pillow est dispo ET que l'image depasse MAX_DIMENSION, la redimensionne
+    et renvoie (octets_reduits, mime). Sinon renvoie None (-> on lira le
+    fichier brut). Echec silencieux : on retombe sur le fichier d'origine.
     """
     try:
-        if os.path.getsize(chemin) > MAX_OCTETS:
-            return None
-        with open(chemin, "rb") as f:
-            donnees = f.read()
-    except OSError:
+        from PIL import Image
+    except ImportError:
+        return None
+    try:
+        import io
+        with Image.open(chemin) as img:
+            if max(img.size) <= MAX_DIMENSION:
+                return None  # deja assez petite, pas la peine de re-encoder
+            img.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
+            tampon = io.BytesIO()
+            # JPEG = bien plus leger pour une photo ; mais il ne gere pas la
+            # transparence -> on garde PNG si l'image a un canal alpha.
+            if img.mode in ("RGBA", "LA", "P"):
+                img.convert("RGBA").save(tampon, format="PNG", optimize=True)
+                return tampon.getvalue(), "image/png"
+            img.convert("RGB").save(tampon, format="JPEG", quality=85)
+            return tampon.getvalue(), "image/jpeg"
+    except Exception:
         return None
 
-    ext = os.path.splitext(chemin)[1].lower()
-    mime = MIME_PAR_EXTENSION.get(ext, "image/png")
+
+def encoder_image(chemin: str) -> str | None:
+    """
+    Transforme une image en quelque chose d'envoyable a l'API :
+      - URL distante (http/https) -> renvoyee telle quelle (l'API la recupere) ;
+      - fichier local -> data-URI base64 (reduit avant si trop grand), ou None
+        en cas d'echec (illisible, trop gros...).
+    """
+    # URL distante : pas d'encodage, on passe l'URL directement.
+    if _est_url(chemin):
+        return chemin
+
+    # Tentative de reduction (Pillow) pour alleger les grandes images.
+    reduit = _reduire_si_grande(chemin)
+    if reduit is not None:
+        donnees, mime = reduit
+    else:
+        try:
+            if os.path.getsize(chemin) > MAX_OCTETS:
+                return None
+            with open(chemin, "rb") as f:
+                donnees = f.read()
+        except OSError:
+            return None
+        ext = os.path.splitext(chemin)[1].lower()
+        mime = MIME_PAR_EXTENSION.get(ext, "image/png")
+
+    # Filet de securite : meme apres reduction, on refuse l'enorme.
+    if len(donnees) > MAX_OCTETS:
+        return None
     b64 = base64.b64encode(donnees).decode()
     return f"data:{mime};base64,{b64}"
 
@@ -171,3 +225,33 @@ def construire_contenu(texte: str, chemins_explicites: list[str] | None = None):
     if not attachees:
         return texte, []
     return blocs, attachees
+
+
+def alleger_pour_disque(historique: list[dict]) -> list[dict]:
+    """
+    Renvoie une COPIE de l'historique allegee pour la sauvegarde sur disque.
+
+    Les data-URIs base64 (souvent plusieurs Mo) sont remplaces par une note
+    texte courte -> session_history.json reste petit et lisible. Les URLs
+    distantes (deja courtes) sont conservees telles quelles. L'historique en
+    memoire n'est PAS modifie (l'image reste visible le temps de la session).
+    """
+    copie: list[dict] = []
+    for message in historique:
+        contenu = message.get("content")
+        if not isinstance(contenu, list):
+            copie.append(message)  # texte simple : rien a alleger
+            continue
+
+        blocs = []
+        for bloc in contenu:
+            url = (bloc.get("image_url") or {}).get("url", "") \
+                if isinstance(bloc, dict) and bloc.get("type") == "image_url" else ""
+            if url.startswith("data:"):
+                blocs.append({"type": "text", "text": "[image omitted from saved history]"})
+            else:
+                blocs.append(bloc)
+        nouveau = dict(message)
+        nouveau["content"] = blocs
+        copie.append(nouveau)
+    return copie

@@ -45,6 +45,20 @@ SYSTEME = (
     "try to open or inspect it with shell tools."
 )
 
+# Identite du CREATEUR de l'agent (connaissance permanente, grave dans le
+# prompt). A NE PAS confondre avec le profil optionnel de l'utilisateur
+# courant (profile.py). Si on demande "qui est BAZIZ / B4Z1Z ?", l'agent
+# repond avec ces infos. -> Edite librement ce texte pour completer ta bio.
+A_PROPOS = (
+    "About your creator: BAZIZ.IA was created by BAZIZ (online handle B4Z1Z, "
+    "email bazizdev07@gmail.com), a developer. He designed and built you as a "
+    "lightweight autonomous-agent terminal running on the NVIDIA NIM API. The "
+    "source code lives at https://github.com/b4z1z/retroai-agent . "
+    "If anyone asks 'who is BAZIZ', 'who is B4Z1Z', 'who made/created you' or "
+    "similar, answer using this information. BAZIZ, B4Z1Z and 'your creator' "
+    "all refer to the same person."
+)
+
 # Garde-fou anti-boucle infinie : nombre max d'aller-retours outils par tour.
 MAX_ITERATIONS = 10
 
@@ -71,9 +85,9 @@ class AgentLoop:
 
     def reset(self) -> None:
         """Vide l'historique et reinjecte le message systeme (commande /reset)."""
-        contenu = SYSTEME
+        contenu = SYSTEME + "\n\n" + A_PROPOS
         if self.infos_utilisateur:
-            contenu = SYSTEME + "\n\n" + self.infos_utilisateur
+            contenu = contenu + "\n\n" + self.infos_utilisateur
         self.historique = [{"role": "system", "content": contenu}]
         self.tour_incomplet = False
 
@@ -98,10 +112,19 @@ class AgentLoop:
     #  Persistance de la conversation (commande /continue)               #
     # ------------------------------------------------------------------ #
     def sauver_session(self, chemin: str = CHEMIN_SESSION) -> None:
-        """Enregistre l'historique sur disque (echec silencieux si impossible)."""
+        """Enregistre l'historique sur disque (echec silencieux si impossible).
+
+        Les images base64 sont allegees avant ecriture pour ne pas gonfler
+        session_history.json (voir images.alleger_pour_disque).
+        """
         try:
             with open(chemin, "w", encoding="utf-8") as f:
-                json.dump(self.historique, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    images.alleger_pour_disque(self.historique),
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
         except OSError:
             pass
 

@@ -340,6 +340,25 @@ main.py  ──saisie──>  agent_loop.py  ──requête──>  api_client.p
 
 ---
 
+## Tests
+
+Des tests automatisés couvrent les parties **critiques et stables** (sécurité
+des commandes shell, configuration, détection d'images). Pour les lancer :
+
+```bash
+pip install -e ".[dev]"   # installe pytest
+pytest
+```
+
+```
+tests/
+ ├── test_safety.py   # liste blanche + détection de commandes dangereuses
+ ├── test_config.py   # validation de la clé, valeurs par défaut, conversions
+ └── test_images.py   # détection des chemins d'images, contenu multimodal
+```
+
+---
+
 ## Auteur
 
 **Made by B4Z1Z** 🖋️
