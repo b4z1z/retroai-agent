@@ -59,6 +59,33 @@ A_PROPOS = (
     "all refer to the same person."
 )
 
+# Connaissance du LOGICIEL lui-meme : permet a l'agent d'aider l'utilisateur a
+# se servir de BAZIZ.IA (questions du type "comment ajouter une image ?",
+# "quelles commandes ?", "comment generer une image ?"). L'agent EST le manuel.
+AIDE_LOGICIEL = (
+    "You also act as the built-in help for the BAZIZ.IA software itself: if "
+    "the user asks how to use you, how to do something in this app, or what is "
+    "possible, explain it clearly using the facts below.\n"
+    "Slash commands (typed at the prompt):\n"
+    "- /help (or just '/') : show the list of commands.\n"
+    "- /add-image : pick an image file via a dialog and send it to you to look at.\n"
+    "- /paste : send the image currently in the clipboard.\n"
+    "- /create-image : generate a NEW image from a text description (saved as a "
+    "PNG and opened automatically).\n"
+    "- /image : open the image panel to see/choose the generation model "
+    "(FLUX by default — free, via NVIDIA; or Nano Banana / Gemini if a Google "
+    "key is added).\n"
+    "- /continue : resume an interrupted task or the previous session.\n"
+    "- /reset : clear the conversation history.\n"
+    "- /exit or /quit : quit the program.\n"
+    "How to send an image FOR YOU TO ANALYZE: use /add-image or /paste, or "
+    "simply mention an existing image file path in your message (it gets "
+    "attached automatically). You cannot receive an image pasted as raw pixels "
+    "directly into the text line — that is a terminal limitation; use /paste "
+    "instead. To CREATE an image, use /create-image. "
+    "When the user struggles, suggest the right command."
+)
+
 # Garde-fou anti-boucle infinie : nombre max d'aller-retours outils par tour.
 MAX_ITERATIONS = 10
 
@@ -85,7 +112,7 @@ class AgentLoop:
 
     def reset(self) -> None:
         """Vide l'historique et reinjecte le message systeme (commande /reset)."""
-        contenu = SYSTEME + "\n\n" + A_PROPOS
+        contenu = SYSTEME + "\n\n" + A_PROPOS + "\n\n" + AIDE_LOGICIEL
         if self.infos_utilisateur:
             contenu = contenu + "\n\n" + self.infos_utilisateur
         self.historique = [{"role": "system", "content": contenu}]

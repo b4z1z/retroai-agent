@@ -6,6 +6,7 @@ Type one of these commands at the prompt, or '/' to show
 this list directly in the terminal.
 
   /help          Show this help
+  /image         Image panel: choose the generation model (FLUX / Nano Banana)
   /add-image     Pick an image via a file dialog and send it
   /paste         Send the image from your clipboard
   /create-image  Generate an image from a text description

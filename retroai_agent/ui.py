@@ -484,7 +484,13 @@ def aide() -> None:
             contenu.append(f"  {cmd:14}", style=f"bold {ACCENT}")
             contenu.append(f"{desc}\n", style=DIM)
         contenu.append(
-            "\nOtherwise, type your request and press Enter.", style=DIM
+            "\nOtherwise, type your request and press Enter.\n", style=DIM
+        )
+        contenu.append("Need help using BAZIZ.IA? ", style=DIM)
+        contenu.append("Just ask me", style=f"bold {ACCENT}")
+        contenu.append(
+            ' — e.g. "how do I send an image?" or "how does /continue work?".',
+            style=DIM,
         )
         _console.print(Panel(contenu, border_style=DIM, padding=(1, 4), expand=True))
     else:
@@ -492,6 +498,8 @@ def aide() -> None:
         for cmd, desc in COMMANDES:
             print(f"  {cmd:14} {desc}")
         print("Otherwise, type your request and press Enter.")
+        print('Need help using BAZIZ.IA? Just ask me '
+              '(e.g. "how do I send an image?").')
 
 
 def exporter_commandes(chemin: str = "COMMANDES.txt") -> None:
@@ -513,6 +521,9 @@ def exporter_commandes(chemin: str = "COMMANDES.txt") -> None:
     lignes += [
         "",
         "Any other text is sent as a message to the agent.",
+        "",
+        "Need help using BAZIZ.IA? Just ask the agent in plain language,",
+        '  e.g. "how do I send an image?" or "how does /create-image work?".',
         "",
     ]
     try:

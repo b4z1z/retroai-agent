@@ -1450,3 +1450,23 @@ ETAT : CODE TERMINE, A VALIDER EN REEL.
   puis propose "Switch to FLUX (free) and retry now? (y/n)" -> bascule
   IMAGE_PROVIDER=nvidia (persiste .env) et regenere aussitot. Refus -> astuce
   (quota reset quotidien, /image pour changer).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Aide logiciel par l'IA elle-meme
+----------------------------------------------------------------
+OBJECTIF :
+  Que l'IA serve aussi de MANUEL : si l'utilisateur demande "how to add an
+  image ?", "quelles commandes ?", "comment generer une image ?", elle aide
+  au lieu de repondre "je suis un assistant textuel".
+
+FICHIERS MODIFIES :
+  - agent_loop.py : nouvelle constante AIDE_LOGICIEL (liste des commandes
+    slash + comment envoyer une image pour analyse vs en creer + limite du
+    coller-image terminal). Injectee dans reset() :
+    systeme = SYSTEME + A_PROPOS + AIDE_LOGICIEL [+ infos_utilisateur].
+  - ui.py : aide() (/help) et exporter_commandes() (COMMANDES.txt) signalent
+    "Need help using BAZIZ.IA? Just ask me".
+
+VERIF : commandes presentes dans AIDE_LOGICIEL ; aide() OK ; 15 tests OK.
+ETAT : TERMINEE.
