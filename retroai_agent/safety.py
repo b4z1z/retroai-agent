@@ -93,21 +93,31 @@ def detecter_danger(commande: str) -> str | None:
     return None
 
 
-def demander_confirmation(titre: str, details: str = "", dangereux: bool = False) -> bool:
+def demander_confirmation(
+    titre: str, details: str = "", dangereux: bool = False, categorie: str = ""
+) -> bool:
     """
     Affiche l'action proposee et demande une confirmation y/n.
+
+    'categorie' ("edit" / "command") permet d'adapter l'astuce sur les modes
+    (quel auto-accept sauterait CETTE confirmation).
 
     Retourne True UNIQUEMENT si l'utilisateur tape explicitement "y" (ou "o").
     Toute autre saisie, y compris Entree seule, retourne False (refus).
     """
     ui.panneau_confirmation(titre, details, dangereux=dangereux)
+    # Rappel discret et CONTEXTUEL : quel mode auto sauterait cette confirmation.
+    ui.astuce_modes(categorie)
 
     try:
         reponse = ui.lire_oui_non("Confirm?")
-    except (EOFError, KeyboardInterrupt):
-        # Pas d'entree disponible ou interruption => on refuse par securite.
+    except EOFError:
+        # Pas d'entree disponible (stdin ferme) => refus par securite.
         ui.info("→ Refused (no confirmation).")
         return False
+    # NB : on NE capture PAS KeyboardInterrupt ici. Ctrl+C sur une confirmation
+    # doit STOPPER tout le tour (comme le bouton stop) et non refuser juste
+    # cette action puis relancer le modele en boucle. On le laisse remonter.
 
     accepte = reponse in ("y", "o", "yes", "oui")
     if accepte:

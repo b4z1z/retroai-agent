@@ -41,6 +41,7 @@ except ImportError:  # pragma: no cover - depend de l'environnement
 # Optionnel : si absent, on retombe sur une saisie classique.
 try:
     from prompt_toolkit import PromptSession
+    from prompt_toolkit.application import run_in_terminal
     from prompt_toolkit.completion import Completer, Completion
     from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.key_binding import KeyBindings
@@ -87,17 +88,6 @@ if PTK_DISPO:
                         display=nom,
                     )
 
-    def _barre_mode():
-        """
-        Barre du bas : affiche le mode d'approbation UNIQUEMENT s'il n'est pas
-        'normal' (pour ne pas encombrer l'ecran en usage courant). C'est le
-        "moment adequat" : on ne montre l'info que quand un mode auto/plan est
-        actif. Mis a jour en direct quand on cycle avec Shift+Tab.
-        """
-        if modes.courant() == modes.NORMAL:
-            return ""  # rien -> barre masquee
-        return f"  ⏵ {modes.label()}   ·   Shift+Tab to change mode "
-
     # La session est creee PARESSEUSEMENT (au 1er usage, dans un vrai
     # terminal). La creer a l'import planterait hors console reelle.
     _session = None
@@ -108,18 +98,19 @@ if PTK_DISPO:
         if _session is None:
             try:
                 # Shift+Tab (BackTab) : cycle entre les modes d'approbation.
+                # Pas de barre permanente (jugee moche) : on affiche juste le
+                # nouveau mode en texte simple, au moment du changement.
                 kb = KeyBindings()
 
                 @kb.add("s-tab")
                 def _(event):
                     modes.cycler()
-                    event.app.invalidate()  # redessine -> barre du bas a jour
+                    run_in_terminal(mode_actuel)  # texte simple au-dessus du prompt
 
                 _session = PromptSession(
                     completer=_CommandeCompleter(),
                     complete_while_typing=True,
                     key_bindings=kb,
-                    bottom_toolbar=_barre_mode,
                 )
             except Exception:
                 return None
@@ -376,6 +367,28 @@ def image_creee(chemin: str) -> None:
         print(f"\n  [Image generated: {chemin}]")
 
 
+def astuce_modes(categorie: str = "") -> None:
+    """
+    Petit rappel (texte simple, discret) affiche lors d'une demande de
+    confirmation. Le message precise QUEL mode auto sauterait CETTE
+    confirmation : 'auto-accept edits' couvre seulement les ecritures de
+    fichiers ; les commandes shell ne sont sautees que par 'auto-accept all'.
+    """
+    if categorie == "edit":
+        texte = ("Tip: Shift+Tab (or /mode) → 'auto-accept edits' (or 'all') "
+                 "to stop confirming file writes.")
+    elif categorie == "command":
+        texte = ("Tip: Shift+Tab (or /mode) → 'auto-accept all' to stop "
+                 "confirming commands ('auto-accept edits' covers file writes only).")
+    else:
+        texte = ("Tip: Shift+Tab (or /mode) → auto-accept to skip these "
+                 "prompts, or plan mode.")
+    if RICH_DISPO:
+        _console.print(f"[{DIM}]{texte}[/]")
+    else:
+        print(f"  {texte}")
+
+
 def mode_actuel() -> None:
     """Affiche le mode d'approbation courant (apres un changement)."""
     nom = modes.label()
@@ -518,6 +531,14 @@ def aide() -> None:
         for cmd, desc in COMMANDES:
             contenu.append(f"  {cmd:14}", style=f"bold {ACCENT}")
             contenu.append(f"{desc}\n", style=DIM)
+        contenu.append("\nApproval modes — press ", style=DIM)
+        contenu.append("Shift+Tab", style=f"bold {ACCENT}")
+        contenu.append(" (or /mode) to cycle:\n", style=DIM)
+        contenu.append(
+            "  normal (confirm all) · auto-accept edits · plan (read-only) · "
+            "auto-accept all\n",
+            style=DIM,
+        )
         contenu.append(
             "\nOtherwise, type your request and press Enter.\n", style=DIM
         )
@@ -532,6 +553,9 @@ def aide() -> None:
         print("\nAvailable commands:")
         for cmd, desc in COMMANDES:
             print(f"  {cmd:14} {desc}")
+        print("\nApproval modes — Shift+Tab (or /mode) to cycle:")
+        print("  normal (confirm all) · auto-accept edits · plan (read-only) "
+              "· auto-accept all")
         print("Otherwise, type your request and press Enter.")
         print('Need help using BAZIZ.IA? Just ask me '
               '(e.g. "how do I send an image?").')

@@ -174,7 +174,7 @@ def _outil_write_file(args: dict, config: Config) -> str:
     # Modes auto-edit / auto-all : ecriture auto-approuvee, sinon confirmation.
     if modes.auto_edits():
         ui.info(f"(auto-accept edits — writing {path} without confirmation)")
-    elif not safety.demander_confirmation("Write a file", details):
+    elif not safety.demander_confirmation("Write a file", details, categorie="edit"):
         return "Action cancelled by the user (write_file refused)."
 
     try:
@@ -252,7 +252,8 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
         if danger:
             details += f"\n!! WARNING: {danger} !!"
         if not safety.demander_confirmation(
-            "Run a shell command", details, dangereux=bool(danger)
+            "Run a shell command", details, dangereux=bool(danger),
+            categorie="command",
         ):
             return "Action cancelled by the user (command refused)."
 

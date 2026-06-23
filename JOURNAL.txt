@@ -1502,3 +1502,66 @@ ETAT : TERMINEE.
   payload -> le modele genere jusqu'a son max). Plafond optionnel via
   MAX_TOKENS>0. L'utilisateur ne veut pas de limite par message (l'API
   plafonne par debit, pas par requete).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Modes d'approbation (facon Claude Code, Shift+Tab)
+----------------------------------------------------------------
+OBJECTIF :
+  Cycler entre des modes d'approbation, defaut sur (normal), affiches
+  seulement quand pertinent (barre du bas si != normal).
+
+MODES (modes.py, etat global, cycle Shift+Tab) :
+  - normal     : tout confirme (defaut).
+  - auto-edit  : ecritures fichiers auto-approuvees ; shell confirme.
+  - plan       : lecture seule -> write_file/run_shell_command BLOQUES,
+    + message systeme injecte (envoyer) "ne rien modifier, proposer un plan".
+  - auto-all   : tout auto-approuve (yolo).
+
+FICHIERS CREES/MODIFIES :
+  - modes.py (NOUVEAU) : NORMAL/AUTO_EDIT/PLAN/AUTO_ALL, ORDRE, courant(),
+    cycler(), definir(), label(), auto_edits()/auto_tout()/est_plan().
+  - tools.py : write_file -> bloque si plan, auto si auto_edits ; 
+    run_shell_command -> bloque si plan, auto si auto_tout (ou safe opt-in).
+  - agent_loop.py : envoyer() prefixe une consigne plan ; import modes.
+  - ui.py : Shift+Tab (s-tab) cycle via KeyBindings ; bottom_toolbar
+    _barre_mode (vide si normal -> masquee) ; helper mode_actuel() ;
+    /mode dans COMMANDES.
+  - main.py : commande /mode (cycle) et /mode <nom> (fixe).
+  - AIDE_LOGICIEL : description des 4 modes pour que l'IA aide.
+
+SECURITE : defaut reste 'normal' (sur). Modes auto = choix explicite user.
+VERIF : cycle OK ; plan bloque l'ecriture (fichier non cree) ; 15 tests OK.
+A TESTER EN REEL : Shift+Tab dans un vrai terminal (binding prompt_toolkit).
+ETAT : CODE TERMINE, A VALIDER EN REEL.
+
+  UI : barre du bas (bottom_toolbar) supprimee (jugee moche). A la place,
+  Shift+Tab affiche le nouveau mode en TEXTE SIMPLE sans surlignage, via
+  run_in_terminal(mode_actuel), au moment du changement. /mode idem.
+
+  Modes : ajoutes a /help (bloc "Approval modes - Shift+Tab to cycle",
+  rich + texte). Astuce ui.astuce_modes() affichee a chaque demande de
+  confirmation (safety.demander_confirmation) -> l'user sait qu'il peut
+  passer en auto-accept pour eviter les confirmations.
+
+  Astuce modes CONTEXTUELLE : demander_confirmation(categorie="edit"/"command")
+  -> ui.astuce_modes precise quel auto-accept saute CETTE confirmation
+  (edits = ecritures seulement ; commandes = auto-accept all).
+
+
+----------------------------------------------------------------
+[2026-06-21] FIX - Ctrl+C : confirmation + reactivite pendant le thinking
+----------------------------------------------------------------
+PROBLEME :
+  Ctrl+C sur une confirmation ne faisait que refuser CETTE action (le modele
+  relancait -> boucle). Et Ctrl+C pendant l'appel API etait lent/inactif
+  (requests bloquant, signal traite a la fin ; pire sous Windows).
+FIX :
+  - safety.demander_confirmation : ne capture plus KeyboardInterrupt (seul
+    EOFError = refus). Ctrl+C remonte -> _executer_tour le capte -> stop du
+    tour (comme le bouton stop) + progression conservee.
+  - agent_loop : _executer_interruptible(fn) lance l'appel dans un thread
+    daemon et join(0.1) en boucle -> Ctrl+C reactif (~100ms). _appel_api
+    l'utilise. Le thread abandonne finit en arriere-plan (resultat ignore).
+VERIF : helper OK (resultat + exceptions) ; 15 tests OK.
+ETAT : TERMINEE (a confirmer en reel).

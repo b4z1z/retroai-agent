@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 
 from .api_client import ApiClient, ApiError
 from .config import Config
@@ -196,17 +197,47 @@ class AgentLoop:
     # ------------------------------------------------------------------ #
     #  Appel API avec un reessai automatique (timeout / erreur reseau)   #
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _executer_interruptible(fn):
+        """
+        Execute fn() dans un thread et attend par petits paliers (100 ms) afin
+        que Ctrl+C reste REACTIF pendant l'appel reseau. Sans ca, l'appel HTTP
+        bloquant (requests) ne rend la main au gestionnaire de signal qu'a la
+        fin -> Ctrl+C inefficace ou tres en retard (notamment sous Windows).
+
+        En cas de Ctrl+C, KeyboardInterrupt remonte immediatement ; le thread
+        (daemon) finit en arriere-plan et son resultat est ignore.
+        """
+        resultat: dict = {}
+
+        def worker():
+            try:
+                resultat["ok"] = fn()
+            except BaseException as exc:  # on relaie toute erreur a l'appelant
+                resultat["err"] = exc
+
+        th = threading.Thread(target=worker, daemon=True)
+        th.start()
+        while th.is_alive():
+            th.join(0.1)  # reveil regulier -> SIGINT (Ctrl+C) traite vite
+        if "err" in resultat:
+            raise resultat["err"]
+        return resultat["ok"]
+
     def _appel_api(self) -> dict:
         """
         Appelle l'API en reessayant UNE fois en cas d'ApiError (timeout,
         coupure reseau...). Si le 2e essai echoue aussi, l'ApiError remonte.
+        L'appel est interruptible (Ctrl+C reactif, cf. _executer_interruptible).
         """
         derniere_erreur: ApiError | None = None
         for tentative in range(2):  # 1 essai + 1 reessai
             try:
                 with ui.reflexion():
-                    return self.client.chat(
-                        self.historique, tools=tools.TOOLS_SCHEMA
+                    return self._executer_interruptible(
+                        lambda: self.client.chat(
+                            self.historique, tools=tools.TOOLS_SCHEMA
+                        )
                     )
             except ApiError as exc:
                 derniere_erreur = exc
