@@ -25,6 +25,7 @@ import subprocess
 from .config import Config
 from . import safety
 from . import ui
+from . import modes
 
 
 # Limite de taille pour read_file (cahier des charges).
@@ -155,6 +156,13 @@ def _outil_write_file(args: dict, config: Config) -> str:
     if not path:
         return "Error: no path provided."
 
+    # Mode PLAN : lecture seule -> on refuse d'ecrire et on invite a planifier.
+    if modes.est_plan():
+        return (
+            "Blocked: plan mode is active (read-only). Do NOT write files. "
+            "Present a step-by-step plan and wait for the user to approve."
+        )
+
     # Apercu pour que l'utilisateur sache ce qu'il valide.
     apercu = content[:300] + ("..." if len(content) > 300 else "")
     details = (
@@ -163,8 +171,10 @@ def _outil_write_file(args: dict, config: Config) -> str:
         f"Preview:\n{apercu}"
     )
 
-    # CONFIRMATION OBLIGATOIRE (risque eleve).
-    if not safety.demander_confirmation("Write a file", details):
+    # Modes auto-edit / auto-all : ecriture auto-approuvee, sinon confirmation.
+    if modes.auto_edits():
+        ui.info(f"(auto-accept edits — writing {path} without confirmation)")
+    elif not safety.demander_confirmation("Write a file", details):
         return "Action cancelled by the user (write_file refused)."
 
     try:
@@ -214,15 +224,28 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
     if not command:
         return "Error: no command provided."
 
+    # Mode PLAN : lecture seule -> on refuse d'executer et on invite a planifier.
+    if modes.est_plan():
+        return (
+            "Blocked: plan mode is active (read-only). Do NOT run commands. "
+            "Present a step-by-step plan and wait for the user to approve."
+        )
+
     # Avertissement renforce si la commande matche un motif dangereux.
     danger = safety.detecter_danger(command)
 
-    # Option opt-in : auto-execute les commandes LECTURE SEULE sures, sans
-    # confirmation. Par defaut desactive -> tout est confirme (ultra-securise).
-    auto = config.auto_safe_commands and safety.est_commande_sure(command)
+    # Auto-execution sans confirmation si :
+    #  - mode auto-all (TOUT approuve), OU
+    #  - option auto_safe_commands ET commande lecture seule sure.
+    auto = modes.auto_tout() or (
+        config.auto_safe_commands and safety.est_commande_sure(command)
+    )
 
     if auto:
-        ui.info("(safe read-only command — running without confirmation)")
+        if modes.auto_tout():
+            ui.info("(auto-accept all — running without confirmation)")
+        else:
+            ui.info("(safe read-only command — running without confirmation)")
     else:
         # CONFIRMATION OBLIGATOIRE (risque eleve / option desactivee).
         details = f"Command: {command}"

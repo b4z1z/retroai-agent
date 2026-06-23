@@ -23,6 +23,7 @@ from . import profile
 from . import ui
 from . import images
 from . import image_gen
+from . import modes
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -51,6 +52,19 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         if saisie == "/reset":
             agent.reset()
             ui.info("History cleared.")
+            continue
+        if saisie == "/mode" or saisie.startswith("/mode "):
+            # /mode -> passe au mode suivant ; /mode <nom> -> fixe directement.
+            arg = saisie[len("/mode"):].strip().lower()
+            if arg:
+                if not modes.definir(arg):
+                    ui.erreur(
+                        "Unknown mode. Use: normal / auto-edit / plan / auto-all "
+                        "(or just /mode to cycle, or Shift+Tab)."
+                    )
+            else:
+                modes.cycler()
+            ui.mode_actuel()
             continue
         if saisie == "/continue":
             # Cas 1 : un tour de la session COURANTE a ete interrompu (echec
@@ -83,8 +97,12 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         if saisie == "/image":
             _menu_image(agent)
             continue
-        if saisie == "/create-image":
-            _creer_image(agent)
+        if saisie == "/create-image" or saisie.startswith("/create-image "):
+            # Description optionnelle sur la meme ligne :
+            #   /create-image un chat astronaute   -> genere directement
+            #   /create-image                       -> demande la description
+            description = saisie[len("/create-image"):].strip()
+            _creer_image(agent, description)
             continue
         # Taper juste "/" (ou "/?") affiche la liste complete des commandes.
         if saisie in ("/", "/?"):
@@ -177,16 +195,18 @@ def _menu_image(agent: AgentLoop) -> None:
     ui.erreur(f"Unknown choice: {choix}")
 
 
-def _creer_image(agent: AgentLoop) -> None:
+def _creer_image(agent: AgentLoop, description: str = "") -> None:
     """
-    Commande /create-image : demande une description puis genere une image
-    (modele FLUX via NIM) enregistree localement. Affiche le chemin du PNG.
+    Commande /create-image : genere une image et l'enregistre localement.
+    La description peut etre passee en ligne (/create-image un chat) ; sinon
+    on la demande. Affiche le chemin du PNG et l'ouvre.
     """
-    try:
-        description = ui.demander_texte("Describe the image to generate:")
-    except (EOFError, KeyboardInterrupt):
-        ui.info("\nCancelled.")
-        return
+    if not description:
+        try:
+            description = ui.demander_texte("Describe the image to generate:")
+        except (EOFError, KeyboardInterrupt):
+            ui.info("\nCancelled.")
+            return
     if not description:
         ui.info("Cancelled (empty description).")
         return

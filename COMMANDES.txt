@@ -15,3 +15,6 @@ this list directly in the terminal.
   /exit, /quit   Quit the program
 
 Any other text is sent as a message to the agent.
+
+Need help using BAZIZ.IA? Just ask the agent in plain language,
+  e.g. "how do I send an image?" or "how does /create-image work?".

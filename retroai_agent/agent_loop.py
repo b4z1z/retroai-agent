@@ -29,6 +29,7 @@ from .config import Config
 from . import tools
 from . import ui
 from . import images
+from . import modes
 
 
 # Fichier local de sauvegarde de la conversation (pour /continue).
@@ -65,25 +66,45 @@ A_PROPOS = (
 AIDE_LOGICIEL = (
     "You also act as the built-in help for the BAZIZ.IA software itself: if "
     "the user asks how to use you, how to do something in this app, or what is "
-    "possible, explain it clearly using the facts below.\n"
-    "Slash commands (typed at the prompt):\n"
-    "- /help (or just '/') : show the list of commands.\n"
-    "- /add-image : pick an image file via a dialog and send it to you to look at.\n"
-    "- /paste : send the image currently in the clipboard.\n"
-    "- /create-image : generate a NEW image from a text description (saved as a "
-    "PNG and opened automatically).\n"
-    "- /image : open the image panel to see/choose the generation model "
-    "(FLUX by default — free, via NVIDIA; or Nano Banana / Gemini if a Google "
-    "key is added).\n"
+    "possible, explain it clearly and ACCURATELY using the exact facts below. "
+    "Do not invent commands, options or syntax that are not listed here.\n"
+    "IMPORTANT about syntax: every slash command is typed on its own line. The "
+    "ONLY command that accepts text on the same line is /create-image. All the "
+    "others are typed alone — they then open a dialog/panel or ask you a "
+    "follow-up question. Never tell the user to append arguments to a command "
+    "other than /create-image (e.g. '/add-image photo.png' does NOT work).\n"
+    "Slash commands:\n"
+    "- /help (or just '/') : show the list of commands. Typing '/' also shows "
+    "live suggestions.\n"
+    "- /create-image : generate a NEW image (saved as a PNG and opened "
+    "automatically). Either write the description on the same line, e.g. "
+    "'/create-image a red fox astronaut, watercolor', OR type '/create-image' "
+    "alone and it will then ask you for the description.\n"
+    "- /image : open the image panel. It shows the CURRENT generation model and "
+    "lets you switch it: 1) FLUX (NVIDIA, free, default), 2) Nano Banana Pro "
+    "(Google), 3) Nano Banana Flash (Google). Choosing a Google model asks for "
+    "a GEMINI_API_KEY once (entered in the app, saved locally in .env). This "
+    "command only configures the model; it does not generate anything.\n"
+    "- /add-image : type it alone; a file-picker dialog opens, you choose an "
+    "image, then it asks for an optional message; the image is sent FOR YOU TO "
+    "ANALYZE. (Needs a graphical dialog; on Linux that means python3-tk.)\n"
+    "- /paste : type it alone; it sends the image currently in the system "
+    "clipboard FOR YOU TO ANALYZE. (Needs the Pillow library.)\n"
+    "- /mode (or pressing Shift+Tab) : cycle the approval mode — normal (every "
+    "action is confirmed, the default), auto-accept edits (file writes are "
+    "auto-approved, shell still confirmed), plan mode (read-only: the agent "
+    "investigates and proposes a plan without changing anything), auto-accept "
+    "all (everything runs without confirmation). The active mode (when not "
+    "normal) is shown in the bottom bar.\n"
     "- /continue : resume an interrupted task or the previous session.\n"
     "- /reset : clear the conversation history.\n"
     "- /exit or /quit : quit the program.\n"
-    "How to send an image FOR YOU TO ANALYZE: use /add-image or /paste, or "
-    "simply mention an existing image file path in your message (it gets "
-    "attached automatically). You cannot receive an image pasted as raw pixels "
-    "directly into the text line — that is a terminal limitation; use /paste "
-    "instead. To CREATE an image, use /create-image. "
-    "When the user struggles, suggest the right command."
+    "To send an image FOR YOU TO ANALYZE: use /add-image, or /paste, or simply "
+    "mention an existing image file path (or an http(s) image URL) inside your "
+    "message — it is attached automatically. You cannot paste raw image pixels "
+    "into the text line (terminal limitation); use /paste for that. To CREATE a "
+    "new image instead, use /create-image. "
+    "When the user struggles, point them to the exact right command."
 )
 
 # Garde-fou anti-boucle infinie : nombre max d'aller-retours outils par tour.
@@ -206,6 +227,15 @@ class AgentLoop:
         referencees dans le texte OU fournies via chemins_images (issu de
         /paste ou /add-image).
         """
+        # Mode plan : on rappelle au modele de ne rien modifier et de planifier.
+        if modes.est_plan():
+            message_utilisateur = (
+                "[Plan mode is active: do NOT edit files or run commands. "
+                "Investigate using read-only tools only, then reply with a "
+                "clear step-by-step plan and wait for approval.]\n\n"
+                + message_utilisateur
+            )
+
         contenu, images_jointes = images.construire_contenu(
             message_utilisateur, chemins_images
         )
@@ -258,10 +288,21 @@ class AgentLoop:
                 raise ApiError(f"Unexpected API response: {exc}") from exc
 
             tool_calls = message.get("tool_calls")
+            finish = reponse["choices"][0].get("finish_reason")
 
             # --- Cas 1 : pas d'outil demande -> reponse finale -----------
             if not tool_calls:
                 contenu = message.get("content") or ""
+                # Reponse coupee par la limite de tokens AVANT d'avoir produit
+                # du contenu (typiquement : long raisonnement qui epuise le
+                # budget). On le dit clairement au lieu d'un "empty response".
+                if not contenu.strip() and finish == "length":
+                    contenu = (
+                        "[The answer was cut off: the model reached its output "
+                        "limit (MAX_TOKENS) — often during long reasoning. Try "
+                        "again, raise MAX_TOKENS in .env, or set "
+                        "ENABLE_THINKING=false for very long code.]"
+                    )
                 self.historique.append({"role": "assistant", "content": contenu})
                 return contenu
 

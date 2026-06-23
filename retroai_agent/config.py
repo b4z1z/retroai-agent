@@ -29,6 +29,10 @@ class Config:
     enable_thinking: bool   # Mode raisonnement active ou non
     shell_timeout: int      # Delai max (s) pour une commande shell
     auto_safe_commands: bool  # Auto-execute les commandes shell sures (opt-in)
+    # Longueur max de la reponse du modele (tokens). 0 = AUCUNE limite : on
+    # n'envoie pas max_tokens, le modele genere jusqu'a son maximum (ideal
+    # pour du long code). Mettre une valeur > 0 pour plafonner. Via MAX_TOKENS.
+    max_tokens: int = 0
     # Generation d'images (commande /create-image). Modele distinct du modele
     # de chat : kimi-k2.6 ne SAIT PAS creer d'images. On utilise un modele de
     # generation (FLUX) sur l'endpoint genai de NVIDIA, avec la MEME cle API.
@@ -134,6 +138,7 @@ def load_config(dotenv_path: str = ".env") -> Config:
         enable_thinking=_env_bool("ENABLE_THINKING", True),
         shell_timeout=_env_int("SHELL_TIMEOUT", 30),
         auto_safe_commands=_env_bool("AUTO_SAFE_COMMANDS", False),
+        max_tokens=_env_int("MAX_TOKENS", 0),
         image_base_url=os.environ.get(
             "IMAGE_BASE_URL", "https://ai.api.nvidia.com/v1/genai"
         ),

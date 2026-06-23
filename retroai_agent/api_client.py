@@ -94,8 +94,12 @@ class ApiClient:
             "model": self.config.model,
             "messages": messages,
             "temperature": 0.6,
-            "max_tokens": 4096,
         }
+
+        # max_tokens : 0 (defaut) = aucune limite, on ne l'envoie PAS (le
+        # modele genere jusqu'a son maximum). > 0 = plafond explicite.
+        if self.config.max_tokens > 0:
+            payload["max_tokens"] = self.config.max_tokens
 
         # Le mode "thinking" (raisonnement) est pilote par la config.
         if self.config.enable_thinking:

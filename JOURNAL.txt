@@ -1470,3 +1470,35 @@ FICHIERS MODIFIES :
 
 VERIF : commandes presentes dans AIDE_LOGICIEL ; aide() OK ; 15 tests OK.
 ETAT : TERMINEE.
+
+  CORRECTIF : /create-image accepte desormais la description EN LIGNE
+  (/create-image un chat) en plus de la forme interactive. L'IA suggerait
+  cette forme alors qu'elle n'existait pas -> code aligne sur l'aide.
+
+  AIDE_LOGICIEL reecrite pour coller EXACTEMENT au comportement reel de
+  chaque commande : regle "seul /create-image accepte du texte en ligne",
+  detail du panneau /image (3 modeles + cle Gemini), /add-image (dialogue,
+  python3-tk), /paste (Pillow), attache via chemin OU URL. Evite que l'IA
+  invente une syntaxe inexistante.
+
+
+----------------------------------------------------------------
+[2026-06-21] FIX - "empty response" sur longue generation (ex. code TASM)
+----------------------------------------------------------------
+CAUSE :
+  max_tokens=4096 (en dur) + mode thinking : sur une longue sortie, le
+  raisonnement epuisait le budget -> coupure avant le contenu -> "" affiche
+  comme "empty response".
+FIX :
+  - config.py : champ max_tokens (defaut 8192), lu depuis MAX_TOKENS.
+  - api_client.py : payload utilise config.max_tokens (au lieu de 4096).
+  - agent_loop.py : si contenu vide ET finish_reason == "length", message
+    clair (augmente MAX_TOKENS / ENABLE_THINKING=false) au lieu d'un vide.
+  - .env.example : MAX_TOKENS=8192 documente.
+VERIF : defaut 8192 ; 15 tests OK.
+ETAT : TERMINEE.
+
+  AJUST : max_tokens defaut passe a 0 = AUCUNE limite (non envoye dans le
+  payload -> le modele genere jusqu'a son max). Plafond optionnel via
+  MAX_TOKENS>0. L'utilisateur ne veut pas de limite par message (l'API
+  plafonne par debit, pas par requete).

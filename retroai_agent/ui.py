@@ -14,6 +14,8 @@ from __future__ import annotations
 import contextlib
 import sys
 
+from . import modes
+
 # Force la sortie console en UTF-8 (sinon, sous Windows en cp1252, les
 # caracteres comme ✻ ⏺ › ou les accents font planter l'affichage).
 # Sans effet sur Linux/macOS, deja en UTF-8.
@@ -41,6 +43,7 @@ try:
     from prompt_toolkit import PromptSession
     from prompt_toolkit.completion import Completer, Completion
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.key_binding import KeyBindings
 
     PTK_DISPO = True
 except ImportError:  # pragma: no cover
@@ -84,6 +87,17 @@ if PTK_DISPO:
                         display=nom,
                     )
 
+    def _barre_mode():
+        """
+        Barre du bas : affiche le mode d'approbation UNIQUEMENT s'il n'est pas
+        'normal' (pour ne pas encombrer l'ecran en usage courant). C'est le
+        "moment adequat" : on ne montre l'info que quand un mode auto/plan est
+        actif. Mis a jour en direct quand on cycle avec Shift+Tab.
+        """
+        if modes.courant() == modes.NORMAL:
+            return ""  # rien -> barre masquee
+        return f"  ⏵ {modes.label()}   ·   Shift+Tab to change mode "
+
     # La session est creee PARESSEUSEMENT (au 1er usage, dans un vrai
     # terminal). La creer a l'import planterait hors console reelle.
     _session = None
@@ -93,9 +107,19 @@ if PTK_DISPO:
         global _session
         if _session is None:
             try:
+                # Shift+Tab (BackTab) : cycle entre les modes d'approbation.
+                kb = KeyBindings()
+
+                @kb.add("s-tab")
+                def _(event):
+                    modes.cycler()
+                    event.app.invalidate()  # redessine -> barre du bas a jour
+
                 _session = PromptSession(
                     completer=_CommandeCompleter(),
                     complete_while_typing=True,
+                    key_bindings=kb,
+                    bottom_toolbar=_barre_mode,
                 )
             except Exception:
                 return None
@@ -352,6 +376,16 @@ def image_creee(chemin: str) -> None:
         print(f"\n  [Image generated: {chemin}]")
 
 
+def mode_actuel() -> None:
+    """Affiche le mode d'approbation courant (apres un changement)."""
+    nom = modes.label()
+    if RICH_DISPO:
+        couleur = DIM if modes.courant() == modes.NORMAL else ACCENT
+        _console.print(f"[bold {couleur}]⏵ Approval mode:[/] [bold]{nom}[/]")
+    else:
+        print(f"  Approval mode: {nom}")
+
+
 def stop_reflexion() -> None:
     """Message affiche quand l'utilisateur stoppe l'agent avec Ctrl+C."""
     if RICH_DISPO:
@@ -434,6 +468,7 @@ COMMANDES = [
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/paste", "Send the image from your clipboard"),
     ("/create-image", "Generate an image from a text description"),
+    ("/mode", "Cycle approval mode (or Shift+Tab): normal / edits / plan / all"),
     ("/continue", "Resume an interrupted task / previous session"),
     ("/reset", "Clear the conversation history"),
     ("/exit, /quit", "Quit the program"),
