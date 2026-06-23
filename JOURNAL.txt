@@ -1565,3 +1565,45 @@ FIX :
     l'utilise. Le thread abandonne finit en arriere-plan (resultat ignore).
 VERIF : helper OK (resultat + exceptions) ; 15 tests OK.
 ETAT : TERMINEE (a confirmer en reel).
+
+  Robustesse : erreur NIM 500 "ResourceExhausted / Worker request limit"
+  (saturation transitoire) detectee via _est_saturation() -> reessai backoff
+  comme un 429 (chat + generer_image) ; si persiste, message court clair
+  MSG_SATURATION au lieu du dump JSON. Vraie erreur serveur = message detaille.
+
+  CORRECTIF : la limite NIM (ResourceExhausted) n'est PAS reessayee (reessayer
+  ne debloque pas une limite atteinte). Message clair immediat MSG_SATURATION
+  couvrant les 2 cas (capacite worker saturee OU quota d'utilisation epuise).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - /add-file : joindre un fichier texte/code
+----------------------------------------------------------------
+FICHIERS :
+  - files.py (NOUVEAU) : choisir_fichier_dialogue() (tkinter, tout fichier),
+    lire_fichier_texte() (-> (contenu, erreur) ; binaire/absent geres ;
+    tronque a 100k chars), construire_message_fichier() (nom + bloc delimite).
+  - main.py : commande /add-file (selecteur OU /add-file <chemin>), handler
+    _ajouter_fichier (lit, demande message optionnel, envoie a l'agent).
+  - ui.py : /add-file dans COMMANDES ; helper fichier_joint() ; import os.
+  - agent_loop.py : /add-file decrit dans AIDE_LOGICIEL (vs /add-image images).
+VERIF : lecture/binaire/absent/menu OK ; 15 tests OK.
+ETAT : TERMINEE (a tester en reel via le selecteur).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - /compose : editeur temporaire (long message / code)
+----------------------------------------------------------------
+FICHIERS :
+  - files.py : _editeur_par_defaut ($VISUAL/$EDITOR sinon notepad/nano) +
+    composer_dans_editeur() (fichier temp via mkstemp, lance l'editeur en
+    bloquant avec shlex.split pour gerer "code -w", relit le contenu, supprime
+    le temp). Retourne texte / "" (vide) / None (editeur introuvable).
+  - main.py : commande /compose -> _composer() (ouvre l'editeur, envoie le
+    texte non vide a l'agent).
+  - ui.py : /compose dans COMMANDES.
+  - agent_loop.py : /compose dans AIDE_LOGICIEL (suggerer pour coller bcp de
+    code -> regle aussi le scroll de la ligne de saisie).
+BUT : coller du code / long texte sans encombrer l'invite (probleme scroll).
+VERIF : compose renvoie le texte (faux editeur) ; defaut notepad ; 15 tests OK.
+ETAT : TERMINEE (a tester en reel avec nano/notepad).

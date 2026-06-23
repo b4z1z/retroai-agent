@@ -41,6 +41,30 @@ class QuotaError(ApiError):
     """
 
 
+# Message court et clair : limite NIM atteinte. Couvre les deux cas possibles
+# (capacite du worker saturee OU quota d'utilisation epuise) car le client ne
+# peut pas les distinguer de facon fiable.
+MSG_SATURATION = (
+    "NVIDIA request limit reached: the server is at capacity OR your usage "
+    "limit is exhausted. Wait a bit and try again, or switch model / API key."
+)
+
+
+def _est_saturation(texte: str) -> bool:
+    """
+    Vrai si une reponse 5xx traduit une SATURATION TRANSITOIRE du worker NIM
+    (ex. 'ResourceExhausted: Worker local total request limit reached (33/32)').
+    Ce cas est reessayable, contrairement a une vraie erreur serveur.
+    """
+    t = (texte or "").lower()
+    return (
+        "resourceexhausted" in t
+        or "resource_exhausted" in t
+        or "request limit reached" in t
+        or "total request limit" in t
+    )
+
+
 def _extraire_image_base64(data: dict) -> str:
     """
     Extrait la chaine base64 de l'image depuis la reponse de l'API genai.
@@ -155,6 +179,13 @@ class ApiClient:
                     f"{len(BACKOFF_DELAIS)} retries. Giving up."
                 )
 
+            # --- Limite NIM atteinte (capacite worker OU quota) ----------
+            # (ex. "ResourceExhausted: Worker local total request limit").
+            # Pas de retry : reessayer ne debloque pas une limite atteinte.
+            # On affiche un message clair tout de suite.
+            if reponse.status_code >= 500 and _est_saturation(reponse.text):
+                raise ApiError(MSG_SATURATION)
+
             # --- Autres erreurs HTTP : pas recuperables ------------------
             if reponse.status_code != 200:
                 extrait = reponse.text[:500]
@@ -224,6 +255,10 @@ class ApiClient:
                     time.sleep(delai)
                     continue
                 raise ApiError("Rate limit (429) still active. Giving up.")
+
+            # Limite NIM atteinte -> message clair, pas de retry inutile.
+            if reponse.status_code >= 500 and _est_saturation(reponse.text):
+                raise ApiError(MSG_SATURATION)
 
             if reponse.status_code != 200:
                 raise ApiError(

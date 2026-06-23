@@ -12,6 +12,7 @@ Aucun autre module ne fait de print() decoratif : ils appellent ui.*.
 from __future__ import annotations
 
 import contextlib
+import os
 import sys
 
 from . import modes
@@ -299,6 +300,17 @@ def image_jointe(nom: str) -> None:
         print(f"  [image attached: {nom}]")
 
 
+def fichier_joint(chemin: str, taille: int) -> None:
+    """Confirme visuellement qu'un fichier texte/code a ete joint au message."""
+    nom = os.path.basename(chemin)
+    if RICH_DISPO:
+        _console.print(
+            f"[{ACCENT}]📄[/]  [{DIM}]file attached: {nom} ({taille} chars)[/]"
+        )
+    else:
+        print(f"  [file attached: {nom} ({taille} chars)]")
+
+
 def menu_image(courant: str, gemini_pret: bool) -> None:
     """
     Affiche le panneau /image : modele courant, commandes image, et options
@@ -479,6 +491,8 @@ COMMANDES = [
     ("/help", "Show this help"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
+    ("/add-file", "Attach a text/code file's content for analysis"),
+    ("/compose", "Open an editor to write/paste a long message or code block"),
     ("/paste", "Send the image from your clipboard"),
     ("/create-image", "Generate an image from a text description"),
     ("/mode", "Cycle approval mode (or Shift+Tab): normal / edits / plan / all"),

@@ -23,6 +23,7 @@ from . import profile
 from . import ui
 from . import images
 from . import image_gen
+from . import files
 from . import modes
 
 
@@ -94,6 +95,13 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             _envoyer_avec_image(agent, images.image_depuis_presse_papiers(),
                                 source="clipboard")
             continue
+        if saisie == "/add-file" or saisie.startswith("/add-file "):
+            # /add-file <chemin>  -> direct ; /add-file  -> selecteur de fichier.
+            _ajouter_fichier(agent, saisie[len("/add-file"):].strip())
+            continue
+        if saisie == "/compose":
+            _composer(agent)
+            continue
         if saisie == "/image":
             _menu_image(agent)
             continue
@@ -144,6 +152,54 @@ def _envoyer_avec_image(agent: AgentLoop, chemin, *, source: str) -> None:
     if not texte:
         texte = "Describe this image."
     _traiter_reponse(agent, saisie=texte, chemins_images=[chemin])
+
+
+def _ajouter_fichier(agent: AgentLoop, chemin: str) -> None:
+    """
+    Commande /add-file : lit un fichier texte/code (selecteur ou chemin donne)
+    et l'envoie a l'agent pour analyse, avec un message optionnel.
+    """
+    if not chemin:
+        chemin = files.choisir_fichier_dialogue()
+    if not chemin:
+        ui.erreur("No file selected "
+                  "(or file dialog unavailable: install python3-tk).")
+        return
+    contenu, erreur = files.lire_fichier_texte(chemin)
+    if erreur:
+        ui.erreur(erreur)
+        return
+    try:
+        message = ui.demander_texte(
+            "Message about this file (Enter to just analyze it):"
+        )
+    except (EOFError, KeyboardInterrupt):
+        ui.info("\nCancelled.")
+        return
+    ui.fichier_joint(chemin, len(contenu))
+    texte = files.construire_message_fichier(chemin, contenu, message)
+    _traiter_reponse(agent, saisie=texte)
+
+
+def _composer(agent: AgentLoop) -> None:
+    """
+    Commande /compose : ouvre un editeur temporaire (nano/notepad/$EDITOR)
+    pour ecrire/coller un long message ou bloc de code sans encombrer la ligne
+    de saisie, puis l'envoie a l'agent.
+    """
+    ui.info("Opening an editor… write your message, then save and close.")
+    texte = files.composer_dans_editeur()
+    if texte is None:
+        ui.erreur(
+            "Could not open an editor. Set $EDITOR (e.g. 'export EDITOR=nano'), "
+            "or just type/paste directly at the prompt."
+        )
+        return
+    texte = texte.strip()
+    if not texte:
+        ui.info("Cancelled (nothing written).")
+        return
+    _traiter_reponse(agent, saisie=texte)
 
 
 def _menu_image(agent: AgentLoop) -> None:
