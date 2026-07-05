@@ -1740,3 +1740,18 @@ ETAT : TERMINEE (a tester en reel avec nano/notepad).
   raisonnement + reponse assemblee correcte + finish stop. Le thinking gris
   s'affichera bien en live.
   ETAT : TERMINE ET VALIDE.
+
+----------------------------------------------------------------
+[2026-07-05] AJUST - Raisonnement masque + methode de travail par etapes
+----------------------------------------------------------------
+  DEMANDE : ne pas montrer le raisonnement brut ; a la place, sur un long
+  projet, travailler proprement etape par etape (plan puis execution).
+  - ui.creer_stream_printer : les fragments de raisonnement ne sont PLUS
+    affiches (ils servent de signe de vie) ; seul le spinner tourne, avec le
+    TEMPS ECOULE ("Thinking… 12s"). La reponse reste streamee en direct.
+  - agent_loop.SYSTEME : nouvelle section METHOD - pour une tache longue :
+    1) plan numerote court, 2) execution etape par etape ("Step 2/4 - ..."),
+    UN fichier / une partie coherente par etape, jamais tout d'un coup.
+    Progression sauvegardee a chaque etape (reprise /continue).
+    Regle FILES reformulee par fichier ("write each file ONCE").
+  VERIF : raisonnement invisible, spinner avec secondes, reponse OK ; 40 tests.

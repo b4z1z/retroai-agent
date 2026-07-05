@@ -15,6 +15,7 @@ import contextlib
 import os
 import sys
 import threading
+import time
 
 from . import modes
 
@@ -310,16 +311,18 @@ class _Attente:
 
     def demarrer(self) -> None:
         def run() -> None:
+            debut = time.monotonic()
             i = 0
             while not self._stop.is_set():
+                secondes = int(time.monotonic() - debut)
                 sys.stdout.write(
                     f"\r  {self.FRAMES[i % len(self.FRAMES)]} {self.message}… "
-                    "(Ctrl+C to stop)  "
+                    f"{secondes}s (Ctrl+C to stop)  "
                 )
                 sys.stdout.flush()
                 i += 1
                 self._stop.wait(0.1)
-            sys.stdout.write("\r" + " " * 48 + "\r")  # efface la ligne
+            sys.stdout.write("\r" + " " * 56 + "\r")  # efface la ligne
             sys.stdout.flush()
 
         self._th = threading.Thread(target=run, daemon=True)
@@ -336,50 +339,34 @@ def creer_stream_printer():
     """
     Cree (printer, cloturer) pour afficher une reponse EN DIRECT (streaming).
 
-    Deroulement visuel (facon Claude) :
-      1. spinner "Thinking…" tant que rien n'arrive ;
-      2. le RAISONNEMENT (mode thinking) s'affiche en GRIS au fil de l'eau,
-         sous un en-tete "✻ Thinking…" -> on voit le modele reflechir ;
-      3. la REPONSE s'affiche ensuite sous l'en-tete "⏺ BAZIZ.IA".
+    Le RAISONNEMENT (mode thinking) n'est PAS affiche : pendant que le modele
+    reflechit, seul le spinner "Thinking… Ns" tourne (les fragments de
+    raisonnement recus servent uniquement de signe de vie). La REPONSE, elle,
+    s'affiche au fil de l'eau sous l'en-tete "⏺ BAZIZ.IA".
 
     printer(fragment, reflexion=False) ; cloturer() -> True si une REPONSE a
     ete affichee (l'appelant ne doit alors pas la reafficher).
     """
     attente = _Attente()
     attente.demarrer()
-    etat = {"mode": None}  # None -> "think" -> "reponse"
-
-    def _entete_pense() -> None:
-        if RICH_DISPO:
-            _console.print()
-            _console.print(f"[{DIM}]✻ Thinking…[/]")
-        else:
-            print("\n[Thinking…]")
+    etat = {"ouvert": False}
 
     def printer(fragment: str, reflexion: bool = False) -> None:
-        if etat["mode"] is None:
-            attente.arreter()
         if reflexion:
-            if etat["mode"] != "think":
-                _entete_pense()
-                etat["mode"] = "think"
-            # Gris ANSI (90) : distinct de la reponse, discret.
-            sys.stdout.write(f"\x1b[90m{fragment}\x1b[0m")
-        else:
-            if etat["mode"] == "think":
-                sys.stdout.write("\n")
-            if etat["mode"] != "reponse":
-                _stream_entete()
-                etat["mode"] = "reponse"
-            sys.stdout.write(fragment)
+            return  # raisonnement masque : le spinner suffit
+        if not etat["ouvert"]:
+            attente.arreter()
+            _stream_entete()
+            etat["ouvert"] = True
+        sys.stdout.write(fragment)
         sys.stdout.flush()
 
     def cloturer() -> bool:
-        attente.arreter()  # au cas ou aucun fragment n'est arrive
-        if etat["mode"] is not None:
+        attente.arreter()  # au cas ou aucune reponse n'est arrivee
+        if etat["ouvert"]:
             sys.stdout.write("\n")
             sys.stdout.flush()
-        return etat["mode"] == "reponse"
+        return etat["ouvert"]
 
     return printer, cloturer
 
