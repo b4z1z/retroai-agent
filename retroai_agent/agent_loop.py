@@ -25,12 +25,13 @@ import json
 import os
 import threading
 
-from .api_client import ApiClient, ApiError
+from .api_client import ApiClient, ApiError, TimeoutApiError
 from .config import Config
 from . import tools
 from . import ui
 from . import images
 from . import modes
+from . import thinking
 
 
 # Fichier local de sauvegarde de la conversation (pour /continue).
@@ -44,7 +45,15 @@ SYSTEME = (
     "and run shell commands. Use them when useful. Reply concisely, in the "
     "same language as the user. If the user references an image file, that "
     "image is ALREADY attached to the message: look at it directly, do not "
-    "try to open or inspect it with shell tools."
+    "try to open or inspect it with shell tools.\n"
+    "IMPORTANT - when asked to CREATE, MODIFY, IMPROVE, FIX or REFACTOR a "
+    "file or its code: do NOT just print the whole new code in the chat. "
+    "ACTUALLY save it with the write_file tool, to the file's exact path when "
+    "it is known (overwrite the original), or to a clearly-named new file "
+    "otherwise. Write the file ONCE, then STOP and give a short text summary "
+    "of what you changed. Do NOT re-read or re-write the same file repeatedly "
+    "to double-check, and do NOT run extra commands to verify, unless the user "
+    "explicitly asks. Keep the number of tool calls minimal."
 )
 
 # Identite du CREATEUR de l'agent (connaissance permanente, grave dans le
@@ -95,16 +104,25 @@ AIDE_LOGICIEL = (
     "to analyze. Type '/add-file' alone to open a file picker, or '/add-file "
     "<path>' to give the path directly; it then asks for an optional message. "
     "(For images use /add-image instead, not /add-file.)\n"
-    "- /compose : open a temporary text editor (nano/notepad/$EDITOR) to write "
-    "or paste a long message or code block comfortably (instead of the cramped "
-    "input line); saving and closing the editor sends it to you. Suggest this "
-    "when the user wants to paste a lot of code or many lines.\n"
+    "- /compose : opens a text editor (notepad on Windows, nano on Linux, or "
+    "$EDITOR e.g. \"code -w\") on a DEDICATED temporary file, to write or paste "
+    "a long message / code block comfortably. The user writes below the marker "
+    "line, saves and closes that window/tab, and the text is sent. "
+    "'/compose <text>' pre-fills the editor. Empty file = cancel.\n"
+    "- /write : multi-line input directly in the terminal (no editor). The "
+    "user types lines and finishes with a single '.' on its own line (or "
+    "Ctrl-D); Ctrl-C cancels. Suggest /compose or /write when the user wants "
+    "to paste many lines of code (the normal input line is single-line: Enter "
+    "sends).\n"
     "- /mode (or pressing Shift+Tab) : cycle the approval mode — normal (every "
     "action is confirmed, the default), auto-accept edits (file writes are "
     "auto-approved, shell still confirmed), plan mode (read-only: the agent "
     "investigates and proposes a plan without changing anything), auto-accept "
     "all (everything runs without confirmation). The active mode (when not "
     "normal) is shown in the bottom bar.\n"
+    "- /think : set the reasoning effort level — low, medium, high, highx, "
+    "ultra ('/think high' to set, '/think' to cycle). Higher = the agent "
+    "thinks more thoroughly (slower); low = fast and direct.\n"
     "- /continue : resume an interrupted task or the previous session.\n"
     "- /reset : clear the conversation history.\n"
     "- /exit or /quit : quit the program.\n"
@@ -116,8 +134,8 @@ AIDE_LOGICIEL = (
     "When the user struggles, point them to the exact right command."
 )
 
-# Garde-fou anti-boucle infinie : nombre max d'aller-retours outils par tour.
-MAX_ITERATIONS = 10
+# Garde-fou anti-boucle infinie : le nombre max d'aller-retours d'outils par
+# tour est desormais dans la config (config.max_iterations, defaut 25).
 
 
 class AgentLoop:
@@ -138,6 +156,9 @@ class AgentLoop:
         # Vrai si le dernier tour a ete interrompu (echec API) et reste a
         # reprendre. Permet a /continue de relancer la ou ca s'est arrete.
         self.tour_incomplet = False
+        # Vrai si la derniere reponse a deja ete affichee en direct (streaming)
+        # -> main n'a pas a la reafficher.
+        self._stream_affiche = False
         self.reset()
 
     def reset(self) -> None:
@@ -234,10 +255,25 @@ class AgentLoop:
 
     def _appel_api(self) -> dict:
         """
-        Appelle l'API en reessayant UNE fois en cas d'ApiError (timeout,
-        coupure reseau...). Si le 2e essai echoue aussi, l'ApiError remonte.
-        L'appel est interruptible (Ctrl+C reactif, cf. _executer_interruptible).
+        Appelle l'API. En STREAMING : la reponse s'affiche en direct (morceau
+        par morceau) -> pas de timeout sur les longues generations, et Ctrl+C
+        reste reactif (le flux rend la main tres souvent). Pas de retry en
+        streaming (un partiel a deja pu s'afficher). En NON-streaming : spinner
+        + appel interruptible + 1 reessai sur erreur reseau.
         """
+        if self.config.stream:
+            printer, cloturer = ui.creer_stream_printer()
+            self._stream_affiche = False
+            try:
+                reponse = self.client.chat(
+                    self.historique, tools=tools.TOOLS_SCHEMA, on_texte=printer
+                )
+            finally:
+                # Vrai si du texte a ete affiche en direct (-> ne pas reafficher).
+                self._stream_affiche = cloturer()
+            return reponse
+
+        # --- Mode non-streaming (reponse complete d'un coup) -------------
         derniere_erreur: ApiError | None = None
         for tentative in range(2):  # 1 essai + 1 reessai
             try:
@@ -247,10 +283,14 @@ class AgentLoop:
                             self.historique, tools=tools.TOOLS_SCHEMA
                         )
                     )
+            except TimeoutApiError:
+                # Un timeout sur une generation deja longue : inutile de
+                # reessayer (on re-attendrait aussi longtemps). On remonte direct.
+                raise
             except ApiError as exc:
                 derniere_erreur = exc
                 if tentative == 0:
-                    ui.info("Failure/timeout — retrying automatically…")
+                    ui.info("Network issue — retrying automatically…")
         # Les deux tentatives ont echoue.
         raise derniere_erreur  # type: ignore[misc]
 
@@ -274,6 +314,11 @@ class AgentLoop:
                 "clear step-by-step plan and wait for approval.]\n\n"
                 + message_utilisateur
             )
+
+        # Niveau de reflexion : on injecte une consigne d'effort (si non vide).
+        consigne_effort = thinking.consigne(self.config.thinking_level)
+        if consigne_effort:
+            message_utilisateur = f"[{consigne_effort}]\n\n" + message_utilisateur
 
         contenu, images_jointes = images.construire_contenu(
             message_utilisateur, chemins_images
@@ -318,7 +363,7 @@ class AgentLoop:
 
     def _dialoguer(self) -> str:
         """Boucle de dialogue : appels API + execution d'outils."""
-        for _ in range(MAX_ITERATIONS):
+        for _ in range(self.config.max_iterations):
             reponse = self._appel_api()
 
             try:
@@ -342,6 +387,9 @@ class AgentLoop:
                         "again, raise MAX_TOKENS in .env, or set "
                         "ENABLE_THINKING=false for very long code.]"
                     )
+                    # Message synthetique : il n'a PAS ete streame a l'ecran,
+                    # main doit donc l'afficher.
+                    self._stream_affiche = False
                 self.historique.append({"role": "assistant", "content": contenu})
                 return contenu
 
@@ -389,5 +437,7 @@ class AgentLoop:
             "[Limit reached: the agent used too many tools in a row without "
             "answering. Please rephrase your request.]"
         )
+        # Message synthetique (pas streame) : main doit l'afficher.
+        self._stream_affiche = False
         self.historique.append({"role": "assistant", "content": message_limite})
         return message_limite

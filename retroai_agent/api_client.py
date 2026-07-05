@@ -14,19 +14,21 @@ Robustesse geree ici :
 
 from __future__ import annotations
 
+import json
 import time
 
 import requests
 
 from .config import Config
+from . import thinking
 
 
 # Delais d'attente (secondes) entre chaque nouvelle tentative apres un 429.
 # 3 valeurs => 3 reessais maximum, soit 4 tentatives au total.
 BACKOFF_DELAIS = [5, 10, 20]
 
-# Temps max (secondes) accorde a UNE requete HTTP avant de l'abandonner.
-TIMEOUT_REQUETE = 120
+# Le delai max d'UNE requete HTTP est desormais dans la config
+# (config.request_timeout, defaut 300s, via REQUEST_TIMEOUT).
 
 
 class ApiError(Exception):
@@ -38,6 +40,14 @@ class QuotaError(ApiError):
     Quota / palier gratuit epuise (HTTP 429 RESOURCE_EXHAUSTED).
     Sous-classe d'ApiError -> les 'except ApiError' existants la capturent
     aussi, mais l'appelant peut la traiter specifiquement (proposer FLUX...).
+    """
+
+
+class TimeoutApiError(ApiError):
+    """
+    La requete a depasse le delai. Sous-classe d'ApiError ; l'appelant peut
+    decider de NE PAS reessayer (relancer ne ferait que re-attendre aussi
+    longtemps pour une generation deja longue).
     """
 
 
@@ -125,8 +135,8 @@ class ApiClient:
         if self.config.max_tokens > 0:
             payload["max_tokens"] = self.config.max_tokens
 
-        # Le mode "thinking" (raisonnement) est pilote par la config.
-        if self.config.enable_thinking:
+        # Le mode "thinking" (raisonnement) est pilote par le niveau courant.
+        if thinking.est_actif(self.config.thinking_level):
             payload["chat_template_kwargs"] = {"thinking": True}
 
         # On n'ajoute la cle "tools" que si des outils sont fournis :
@@ -140,26 +150,38 @@ class ApiClient:
     # ------------------------------------------------------------------ #
     #  Appel principal                                                   #
     # ------------------------------------------------------------------ #
-    def chat(self, messages: list, tools: list | None = None) -> dict:
+    def chat(self, messages: list, tools: list | None = None, on_texte=None) -> dict:
         """
-        Envoie la conversation a l'API et retourne la reponse JSON brute.
+        Envoie la conversation et retourne la reponse au format JSON "classique"
+        (meme structure en streaming et non-streaming -> agent_loop inchange).
 
-        Gere automatiquement le retry/backoff sur les 429. Leve ApiError
-        en cas d'echec definitif (mauvaise cle, serveur HS, JSON invalide...).
+        Si config.stream est vrai : reponse recue morceau par morceau
+        (on_texte(fragment) appele a chaque bout de texte) -> pas de timeout
+        sur les longues generations + affichage en direct. Sinon : reponse
+        complete d'un coup. Retry/backoff 429 ; leve ApiError/TimeoutApiError.
         """
         payload = self._construire_payload(messages, tools)
+        if self.config.stream:
+            payload["stream"] = True
+            return self._chat_stream(payload, on_texte)
+        return self._chat_simple(payload)
+
+    def _chat_simple(self, payload: dict) -> dict:
+        """Appel NON-streaming : la reponse complete arrive d'un coup."""
         url = self.config.base_url
 
         # On tente 1 fois + autant de reessais que de delais de backoff.
         for tentative in range(len(BACKOFF_DELAIS) + 1):
             try:
                 reponse = self.session.post(
-                    url, json=payload, timeout=TIMEOUT_REQUETE
+                    url, json=payload, timeout=self.config.request_timeout
                 )
             except requests.exceptions.Timeout as exc:
-                raise ApiError(
-                    f"Request timed out ({TIMEOUT_REQUETE}s). "
-                    "The NVIDIA server is taking too long to respond."
+                raise TimeoutApiError(
+                    f"Request timed out ({self.config.request_timeout}s). "
+                    "The task may be large — try a lower /think level, raise "
+                    "REQUEST_TIMEOUT in .env, or split the request. "
+                    "Type /continue to resume."
                 ) from exc
             except requests.exceptions.RequestException as exc:
                 raise ApiError(f"Network error: {exc}") from exc
@@ -206,6 +228,111 @@ class ApiClient:
         raise ApiError("Unexpected API call failure.")
 
     # ------------------------------------------------------------------ #
+    #  Appel STREAMING (SSE) : reponse morceau par morceau               #
+    # ------------------------------------------------------------------ #
+    def _chat_stream(self, payload: dict, on_texte=None) -> dict:
+        """
+        Appel streaming : on lit le flux SSE, on accumule le texte (et les
+        tool_calls), on appelle on_texte(fragment) a chaque morceau de texte,
+        puis on renvoie la MEME structure que _chat_simple.
+        """
+        url = self.config.base_url
+        for tentative in range(len(BACKOFF_DELAIS) + 1):
+            try:
+                reponse = self.session.post(
+                    url, json=payload,
+                    timeout=self.config.request_timeout, stream=True,
+                    headers={"Accept": "text/event-stream"},
+                )
+            except requests.exceptions.Timeout as exc:
+                raise TimeoutApiError(
+                    f"Request timed out ({self.config.request_timeout}s). "
+                    "Type /continue to resume."
+                ) from exc
+            except requests.exceptions.RequestException as exc:
+                raise ApiError(f"Network error: {exc}") from exc
+
+            if reponse.status_code == 429:
+                if tentative < len(BACKOFF_DELAIS):
+                    delai = BACKOFF_DELAIS[tentative]
+                    print(f"  [API] Rate limit (429). Retrying in {delai}s...")
+                    time.sleep(delai)
+                    continue
+                raise ApiError("Rate limit (429) still active. Giving up.")
+            if reponse.status_code >= 500 and _est_saturation(reponse.text):
+                raise ApiError(MSG_SATURATION)
+            if reponse.status_code != 200:
+                raise ApiError(
+                    f"HTTP error {reponse.status_code} from the NVIDIA API:\n"
+                    f"{reponse.text[:500]}"
+                )
+
+            return self._lire_flux(reponse, on_texte)
+
+        raise ApiError("Unexpected API call failure.")
+
+    @staticmethod
+    def _lire_flux(reponse, on_texte) -> dict:
+        """
+        Lit le flux SSE et reconstruit le message (texte + tool_calls).
+
+        on_texte(fragment, reflexion) est appele pour chaque morceau :
+          - reflexion=True  : morceau de RAISONNEMENT (mode thinking) ->
+            affiche en direct mais PAS conserve dans l'historique ;
+          - reflexion=False : morceau de la REPONSE finale.
+        """
+        contenu = ""
+        outils: dict = {}
+        finish = None
+        try:
+            for ligne in reponse.iter_lines(decode_unicode=True):
+                if not ligne:
+                    continue
+                if ligne.startswith("data:"):
+                    ligne = ligne[5:].strip()
+                if ligne == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(ligne)
+                except ValueError:
+                    continue  # ligne non-JSON (keep-alive...) -> on ignore
+                choix = (obj.get("choices") or [{}])[0]
+                delta = choix.get("delta") or {}
+                # Raisonnement (thinking) streame par NIM : montre en direct
+                # pour que l'utilisateur VOIE que le modele travaille.
+                frag_pense = delta.get("reasoning_content") or delta.get("reasoning")
+                if frag_pense and on_texte:
+                    on_texte(frag_pense, True)
+                frag = delta.get("content")
+                if frag:
+                    contenu += frag
+                    if on_texte:
+                        on_texte(frag, False)
+                for tc in (delta.get("tool_calls") or []):
+                    idx = tc.get("index", 0)
+                    slot = outils.setdefault(
+                        idx,
+                        {"id": None, "type": "function",
+                         "function": {"name": "", "arguments": ""}},
+                    )
+                    if tc.get("id"):
+                        slot["id"] = tc["id"]
+                    fonction = tc.get("function") or {}
+                    if fonction.get("name"):
+                        slot["function"]["name"] += fonction["name"]
+                    if fonction.get("arguments"):
+                        slot["function"]["arguments"] += fonction["arguments"]
+                if choix.get("finish_reason"):
+                    finish = choix["finish_reason"]
+        except requests.exceptions.RequestException as exc:
+            raise ApiError(f"Network error during streaming: {exc}") from exc
+
+        message = {"role": "assistant", "content": contenu}
+        if outils:
+            message["tool_calls"] = [outils[i] for i in sorted(outils)]
+        return {"choices": [{"message": message, "finish_reason": finish}]}
+
+    # ------------------------------------------------------------------ #
     #  Generation d'image (text-to-image) - endpoint genai (FLUX)        #
     # ------------------------------------------------------------------ #
     def generer_image(
@@ -239,11 +366,11 @@ class ApiClient:
         for tentative in range(len(BACKOFF_DELAIS) + 1):
             try:
                 reponse = self.session.post(
-                    url, json=payload, timeout=TIMEOUT_REQUETE
+                    url, json=payload, timeout=self.config.request_timeout
                 )
             except requests.exceptions.Timeout as exc:
-                raise ApiError(
-                    f"Image request timed out ({TIMEOUT_REQUETE}s)."
+                raise TimeoutApiError(
+                    f"Image request timed out ({self.config.request_timeout}s)."
                 ) from exc
             except requests.exceptions.RequestException as exc:
                 raise ApiError(f"Network error: {exc}") from exc

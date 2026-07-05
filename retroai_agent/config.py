@@ -26,13 +26,24 @@ class Config:
     api_key: str            # Cle API NVIDIA (obligatoire)
     base_url: str           # URL de l'endpoint chat/completions
     model: str              # Nom du modele a interroger
-    enable_thinking: bool   # Mode raisonnement active ou non
+    enable_thinking: bool   # Mode raisonnement active ou non (compat ; voir
+                            # thinking_level qui le pilote desormais)
     shell_timeout: int      # Delai max (s) pour une commande shell
     auto_safe_commands: bool  # Auto-execute les commandes shell sures (opt-in)
     # Longueur max de la reponse du modele (tokens). 0 = AUCUNE limite : on
     # n'envoie pas max_tokens, le modele genere jusqu'a son maximum (ideal
     # pour du long code). Mettre une valeur > 0 pour plafonner. Via MAX_TOKENS.
     max_tokens: int = 0
+    # Delai max (s) d'UNE requete HTTP. Genereux car une longue generation
+    # (ex. /think ultra sur un gros fichier) arrive d'un coup a la fin.
+    request_timeout: int = 300
+    # Streaming : la reponse arrive morceau par morceau (comme Claude) -> pas
+    # de timeout sur les longues generations + affichage en direct. STREAM=false
+    # pour revenir a l'ancien mode (reponse complete d'un coup, rendu Markdown).
+    stream: bool = True
+    # Nombre max d'aller-retours d'outils par tour avant de rendre la main.
+    # Genereux pour les taches multi-etapes (lire/ecrire/verifier/corriger).
+    max_iterations: int = 25
     # Generation d'images (commande /create-image). Modele distinct du modele
     # de chat : kimi-k2.6 ne SAIT PAS creer d'images. On utilise un modele de
     # generation (FLUX) sur l'endpoint genai de NVIDIA, avec la MEME cle API.
@@ -45,6 +56,10 @@ class Config:
     # in-app, ecrite dans .env) ou manuellement. Vides si non utilises.
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-pro-image"
+    # Niveau d'effort de reflexion : low / medium / high / highx / ultra.
+    # Reglable a chaud via /think. Pilote l'activation du raisonnement + une
+    # consigne d'effort (voir thinking.py).
+    thinking_level: str = "medium"
 
 
 # --------------------------------------------------------------------------- #
@@ -139,6 +154,9 @@ def load_config(dotenv_path: str = ".env") -> Config:
         shell_timeout=_env_int("SHELL_TIMEOUT", 30),
         auto_safe_commands=_env_bool("AUTO_SAFE_COMMANDS", False),
         max_tokens=_env_int("MAX_TOKENS", 0),
+        request_timeout=_env_int("REQUEST_TIMEOUT", 300),
+        stream=_env_bool("STREAM", True),
+        max_iterations=_env_int("MAX_ITERATIONS", 25),
         image_base_url=os.environ.get(
             "IMAGE_BASE_URL", "https://ai.api.nvidia.com/v1/genai"
         ),
@@ -146,6 +164,12 @@ def load_config(dotenv_path: str = ".env") -> Config:
         image_provider=os.environ.get("IMAGE_PROVIDER", "nvidia").strip().lower(),
         gemini_api_key=os.environ.get("GEMINI_API_KEY", "").strip(),
         gemini_model=os.environ.get("GEMINI_MODEL", "gemini-3-pro-image"),
+        # THINKING_LEVEL prioritaire ; sinon derive de ENABLE_THINKING
+        # (compat : false -> low, true -> medium).
+        thinking_level=(
+            os.environ.get("THINKING_LEVEL", "").strip().lower()
+            or ("medium" if _env_bool("ENABLE_THINKING", True) else "low")
+        ),
     )
 
 

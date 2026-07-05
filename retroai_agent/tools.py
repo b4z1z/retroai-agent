@@ -163,11 +163,15 @@ def _outil_write_file(args: dict, config: Config) -> str:
             "Present a step-by-step plan and wait for the user to approve."
         )
 
-    # Apercu pour que l'utilisateur sache ce qu'il valide.
-    apercu = content[:300] + ("..." if len(content) > 300 else "")
+    # Apercu (genereux) pour que l'utilisateur VOIE le code ecrit.
+    LIMITE_APERCU = 1500
+    apercu = content[:LIMITE_APERCU] + (
+        f"\n… (+{len(content) - LIMITE_APERCU} more characters)"
+        if len(content) > LIMITE_APERCU else ""
+    )
     details = (
         f"File:    {path}\n"
-        f"Size:    {len(content)} characters\n"
+        f"Size:    {len(content)} characters, {content.count(chr(10)) + 1} lines\n"
         f"Preview:\n{apercu}"
     )
 

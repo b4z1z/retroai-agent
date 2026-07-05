@@ -151,8 +151,14 @@ def choisir_image_dialogue() -> str | None:
     try:
         racine = tk.Tk()
         racine.withdraw()                      # cache la fenetre principale
-        racine.attributes("-topmost", True)    # passe au premier plan
+        racine.wm_attributes("-topmost", True) # passe au premier plan
+        racine.update()                        # applique avant d'ouvrir
+        try:
+            racine.focus_force()               # evite le dialogue cache derriere
+        except Exception:
+            pass
         chemin = filedialog.askopenfilename(
+            parent=racine,
             title="Choose an image",
             filetypes=[
                 ("Images", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),

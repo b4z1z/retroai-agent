@@ -110,7 +110,7 @@ def demander_confirmation(
     ui.astuce_modes(categorie)
 
     try:
-        reponse = ui.lire_oui_non("Confirm?")
+        reponse = ui.lire_oui_non("Confirm?", categorie=categorie)
     except EOFError:
         # Pas d'entree disponible (stdin ferme) => refus par securite.
         ui.info("→ Refused (no confirmation).")

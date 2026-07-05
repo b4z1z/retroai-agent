@@ -25,6 +25,7 @@ from . import images
 from . import image_gen
 from . import files
 from . import modes
+from . import thinking
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -67,6 +68,34 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
                 modes.cycler()
             ui.mode_actuel()
             continue
+        if saisie == "/think" or saisie.startswith("/think "):
+            # /think <niveau> -> fixe directement ; /think -> menu a fleches.
+            arg = saisie[len("/think"):].strip().lower()
+            if arg:
+                if arg in thinking.NIVEAUX:
+                    agent.config.thinking_level = arg
+                else:
+                    ui.erreur("Unknown level. Use: " + " / ".join(thinking.NIVEAUX))
+                    continue
+            else:
+                courant = thinking.normaliser(agent.config.thinking_level)
+                options = [
+                    (n, f"{n:7} — {thinking.DESCRIPTIONS[n]}")
+                    for n in thinking.NIVEAUX
+                ]
+                choix = ui.selecteur(
+                    "Thinking level",
+                    "Reasoning effort (↑/↓ then Enter, Esc to cancel):",
+                    options,
+                    defaut=courant,
+                )
+                if not choix:  # annule ou pas de selecteur -> on ne change rien
+                    ui.niveau_thinking(agent.config.thinking_level)
+                    continue
+                agent.config.thinking_level = choix
+            set_env_value("THINKING_LEVEL", agent.config.thinking_level)
+            ui.niveau_thinking(agent.config.thinking_level)
+            continue
         if saisie == "/continue":
             # Cas 1 : un tour de la session COURANTE a ete interrompu (echec
             # API) -> on reprend exactement la ou ca s'est arrete.
@@ -99,8 +128,12 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             # /add-file <chemin>  -> direct ; /add-file  -> selecteur de fichier.
             _ajouter_fichier(agent, saisie[len("/add-file"):].strip())
             continue
-        if saisie == "/compose":
-            _composer(agent)
+        if saisie == "/compose" or saisie.startswith("/compose "):
+            # /compose <texte> -> ouvre l'editeur pre-rempli avec ce texte.
+            _composer(agent, saisie[len("/compose"):].strip())
+            continue
+        if saisie == "/write":
+            _ecrire_multiligne(agent)
             continue
         if saisie == "/image":
             _menu_image(agent)
@@ -127,7 +160,8 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
 
         # 3. Saisie normale -> on interroge l'agent (le spinner est gere
-        #    dans agent_loop, autour de chaque appel API).
+        #    dans agent_loop). Pour un message multi-ligne, utiliser Alt+Entree
+        #    (retour a la ligne) puis Entree pour envoyer, ou /write, ou /compose.
         _traiter_reponse(agent, saisie=saisie)
 
 
@@ -162,8 +196,16 @@ def _ajouter_fichier(agent: AgentLoop, chemin: str) -> None:
     if not chemin:
         chemin = files.choisir_fichier_dialogue()
     if not chemin:
-        ui.erreur("No file selected "
-                  "(or file dialog unavailable: install python3-tk).")
+        # Repli : pas de dialogue (annule, cache, ou tkinter indispo) ->
+        # on demande le chemin directement pour que /add-file marche quand meme.
+        ui.info("No file picker. Type the file path "
+                "(tip: you can also use /add-file <path>).")
+        try:
+            chemin = ui.demander_texte("File path (Enter to cancel):")
+        except (EOFError, KeyboardInterrupt):
+            chemin = ""
+    if not chemin:
+        ui.info("Cancelled (no file).")
         return
     contenu, erreur = files.lire_fichier_texte(chemin)
     if erreur:
@@ -181,23 +223,44 @@ def _ajouter_fichier(agent: AgentLoop, chemin: str) -> None:
     _traiter_reponse(agent, saisie=texte)
 
 
-def _composer(agent: AgentLoop) -> None:
+def _composer(agent: AgentLoop, initial: str = "") -> None:
     """
-    Commande /compose : ouvre un editeur temporaire (nano/notepad/$EDITOR)
-    pour ecrire/coller un long message ou bloc de code sans encombrer la ligne
-    de saisie, puis l'envoie a l'agent.
+    Commande /compose : ouvre un editeur (notepad/nano/$EDITOR) sur un fichier
+    temporaire DEDIE pour ecrire/coller un long message ou bloc de code, puis
+    l'envoie a l'agent. '/compose <texte>' pre-remplit l'editeur.
     """
-    ui.info("Opening an editor… write your message, then save and close.")
-    texte = files.composer_dans_editeur()
+    ui.info("Opening the editor… write below the marker line, then save "
+            "and close (just that window/tab). Empty = cancel.")
+    texte = files.composer_dans_editeur(initial)
     if texte is None:
         ui.erreur(
-            "Could not open an editor. Set $EDITOR (e.g. 'export EDITOR=nano'), "
-            "or just type/paste directly at the prompt."
+            "Could not open an editor. Set EDITOR (e.g. notepad, nano, "
+            "\"code -w\"), or use /write to type inline."
         )
         return
     texte = texte.strip()
     if not texte:
         ui.info("Cancelled (nothing written).")
+        return
+    _traiter_reponse(agent, saisie=texte)
+
+
+def _ecrire_multiligne(agent: AgentLoop) -> None:
+    """
+    Commande /write : saisie multi-ligne DIRECTE dans le terminal (aucun
+    editeur a ouvrir/fermer). Terminer par une ligne contenant seulement '.'
+    (ou Ctrl-D) ; Ctrl-C annule.
+    """
+    ui.info("Multi-line input — type your lines. End with a single '.' on "
+            "its own line (or Ctrl-D). Ctrl-C cancels.")
+    try:
+        texte = ui.lire_multiligne(".")
+    except KeyboardInterrupt:
+        ui.info("\nCancelled.")
+        return
+    texte = texte.strip()
+    if not texte:
+        ui.info("Cancelled (empty).")
         return
     _traiter_reponse(agent, saisie=texte)
 
@@ -349,6 +412,9 @@ def _traiter_reponse(agent: AgentLoop, *, saisie: str = "", reprise: bool = Fals
         # Ctrl+C pendant la reflexion = STOP : on revient au prompt sans
         # quitter l'appli. La progression est conservee (cf. _executer_tour).
         ui.stop_reflexion()
+        return
+    # En streaming, la reponse a deja ete affichee en direct -> pas de re-rendu.
+    if getattr(agent, "_stream_affiche", False):
         return
     ui.reponse_agent(reponse)
 

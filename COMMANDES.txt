@@ -8,9 +8,13 @@ this list directly in the terminal.
   /help          Show this help
   /image         Image panel: choose the generation model (FLUX / Nano Banana)
   /add-image     Pick an image via a file dialog and send it
+  /add-file      Attach a text/code file's content for analysis
+  /compose       (coming soon) Open an editor for a long message / code block
+  /write         (coming soon) Multi-line input — for now use Alt+Enter
   /paste         Send the image from your clipboard
   /create-image  Generate an image from a text description
   /mode          Cycle approval mode (or Shift+Tab): normal / edits / plan / all
+  /think         Pick reasoning effort with arrows (low → ultra)
   /continue      Resume an interrupted task / previous session
   /reset         Clear the conversation history
   /exit, /quit   Quit the program

@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import os
 import sys
+import threading
 
 from . import modes
 
@@ -37,6 +38,38 @@ try:
 except ImportError:  # pragma: no cover - depend de l'environnement
     RICH_DISPO = False
     _console = None
+
+
+def _largeur_visible() -> int:
+    """
+    Largeur VISIBLE du terminal (colonnes de la fenetre, pas du buffer).
+    os.get_terminal_size() renvoie la fenetre visible sous Windows ; on s'en
+    sert pour eviter que rich rende des lignes plus larges que la fenetre (ce
+    qui fait couper les mots en deux par le terminal en mode fenetre).
+    """
+    try:
+        return max(20, os.get_terminal_size().columns)
+    except OSError:
+        try:
+            import shutil
+            return max(20, shutil.get_terminal_size((80, 24)).columns)
+        except Exception:
+            return 80
+
+
+def _rafraichir_console() -> None:
+    """
+    Recree la console en fixant sa largeur sur la largeur VISIBLE courante.
+    Appelee a chaque tour (dans lire_saisie) -> suit le redimensionnement de
+    la fenetre et garantit un retour a la ligne aux bons endroits (mots
+    entiers), au lieu d'une coupure au milieu par le terminal.
+    """
+    global _console
+    if RICH_DISPO:
+        try:
+            _console = Console(width=_largeur_visible())
+        except Exception:
+            pass
 
 # prompt_toolkit : auto-completion EN DIRECT des commandes (Windows + Linux).
 # Optionnel : si absent, on retombe sur une saisie classique.
@@ -98,9 +131,10 @@ if PTK_DISPO:
         global _session
         if _session is None:
             try:
-                # Shift+Tab (BackTab) : cycle entre les modes d'approbation.
-                # Pas de barre permanente (jugee moche) : on affiche juste le
-                # nouveau mode en texte simple, au moment du changement.
+                # Saisie simple et FIABLE : Entree = envoyer (comportement par
+                # defaut). On ajoute seulement Shift+Tab pour cycler les modes.
+                # (Le multi-ligne via Alt+Entree sera repris plus tard ; un
+                # override de la touche Entree cassait l'envoi des commandes.)
                 kb = KeyBindings()
 
                 @kb.add("s-tab")
@@ -180,7 +214,7 @@ def au_revoir() -> None:
     art = _texte_pixel("GOODBYE")
     lignes = art.split("\n")
     if RICH_DISPO:
-        largeur = max(20, _console.size.width)
+        largeur = _largeur_visible()
         bloc = max(len(ligne) for ligne in lignes)
         marge = " " * max(0, (largeur - bloc) // 2)
         _console.print()
@@ -213,9 +247,14 @@ def lire_saisie() -> str:
     profite de l'auto-completion EN DIRECT des commandes (tape '/').
     Sinon, on retombe sur une saisie classique (rich, puis input()).
     """
-    # Haut du cadre (commun a tous les modes).
-    largeur = max(20, _console.size.width) if RICH_DISPO else 80
-    haut = "╭─ You " + "─" * max(0, largeur - 7)
+    # Aligne la largeur de rendu sur la fenetre visible courante (suit le
+    # resize ; evite la coupure des mots en mode fenetre).
+    _rafraichir_console()
+
+    # Haut du cadre (commun a tous les modes). On laisse 1 colonne de marge
+    # (largeur - 1) pour ne pas declencher un retour a la ligne du terminal.
+    largeur = _largeur_visible() if RICH_DISPO else 80
+    haut = "╭─ You " + "─" * max(0, largeur - 8)
     if RICH_DISPO:
         _console.print()
         _console.print(haut, style=ACCENT)
@@ -245,6 +284,106 @@ def lire_saisie() -> str:
     return input("╰─› ").strip()
 
 
+def _stream_entete() -> None:
+    """En-tete affiche une fois, juste avant le 1er fragment streame."""
+    if RICH_DISPO:
+        _console.print()
+        _console.print(f"[bold {ACCENT}]⏺ BAZIZ.IA[/]")
+        _console.print()
+    else:
+        print("\nBAZIZ.IA >")
+
+
+class _Attente:
+    """
+    Spinner anime (thread) affiche PENDANT que le modele reflechit, avant le
+    1er morceau de reponse streame. Donne un retour visuel (sinon ca parait
+    fige, surtout en /think ultra). S'efface des le 1er fragment.
+    """
+
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, message: str = "Thinking") -> None:
+        self._stop = threading.Event()
+        self._th: threading.Thread | None = None
+        self.message = message
+
+    def demarrer(self) -> None:
+        def run() -> None:
+            i = 0
+            while not self._stop.is_set():
+                sys.stdout.write(
+                    f"\r  {self.FRAMES[i % len(self.FRAMES)]} {self.message}… "
+                    "(Ctrl+C to stop)  "
+                )
+                sys.stdout.flush()
+                i += 1
+                self._stop.wait(0.1)
+            sys.stdout.write("\r" + " " * 48 + "\r")  # efface la ligne
+            sys.stdout.flush()
+
+        self._th = threading.Thread(target=run, daemon=True)
+        self._th.start()
+
+    def arreter(self) -> None:
+        if self._th is not None:
+            self._stop.set()
+            self._th.join(timeout=0.5)
+            self._th = None
+
+
+def creer_stream_printer():
+    """
+    Cree (printer, cloturer) pour afficher une reponse EN DIRECT (streaming).
+
+    Deroulement visuel (facon Claude) :
+      1. spinner "Thinking…" tant que rien n'arrive ;
+      2. le RAISONNEMENT (mode thinking) s'affiche en GRIS au fil de l'eau,
+         sous un en-tete "✻ Thinking…" -> on voit le modele reflechir ;
+      3. la REPONSE s'affiche ensuite sous l'en-tete "⏺ BAZIZ.IA".
+
+    printer(fragment, reflexion=False) ; cloturer() -> True si une REPONSE a
+    ete affichee (l'appelant ne doit alors pas la reafficher).
+    """
+    attente = _Attente()
+    attente.demarrer()
+    etat = {"mode": None}  # None -> "think" -> "reponse"
+
+    def _entete_pense() -> None:
+        if RICH_DISPO:
+            _console.print()
+            _console.print(f"[{DIM}]✻ Thinking…[/]")
+        else:
+            print("\n[Thinking…]")
+
+    def printer(fragment: str, reflexion: bool = False) -> None:
+        if etat["mode"] is None:
+            attente.arreter()
+        if reflexion:
+            if etat["mode"] != "think":
+                _entete_pense()
+                etat["mode"] = "think"
+            # Gris ANSI (90) : distinct de la reponse, discret.
+            sys.stdout.write(f"\x1b[90m{fragment}\x1b[0m")
+        else:
+            if etat["mode"] == "think":
+                sys.stdout.write("\n")
+            if etat["mode"] != "reponse":
+                _stream_entete()
+                etat["mode"] = "reponse"
+            sys.stdout.write(fragment)
+        sys.stdout.flush()
+
+    def cloturer() -> bool:
+        attente.arreter()  # au cas ou aucun fragment n'est arrive
+        if etat["mode"] is not None:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        return etat["mode"] == "reponse"
+
+    return printer, cloturer
+
+
 def reponse_agent(texte: str) -> None:
     """Affiche la reponse de l'agent (rendue en Markdown si rich dispo)."""
     if not texte:
@@ -270,6 +409,16 @@ def info(texte: str) -> None:
         print(f"  {texte}")
 
 
+def en_developpement(nom: str) -> None:
+    """Signale qu'une fonctionnalite est en cours de developpement (a venir)."""
+    if RICH_DISPO:
+        _console.print(
+            f"[bold {ACCENT}]🚧 {nom}[/] [{DIM}]is under development — coming soon.[/]"
+        )
+    else:
+        print(f"  [{nom}] under development - coming soon.")
+
+
 def succes(texte: str) -> None:
     if RICH_DISPO:
         _console.print(f"[{SUCCES}]{texte}[/]")
@@ -285,11 +434,56 @@ def erreur(texte: str) -> None:
         print(f"  [Erreur] {texte}")
 
 
+def selecteur(titre: str, texte: str, options: list, defaut=None):
+    """
+    Menu a FLECHES (haut/bas) pour choisir parmi 'options'. Retourne la valeur
+    choisie, ou None si annule / indisponible (l'appelant gere alors un repli).
+
+    options : liste de couples (valeur, libelle_affiche).
+    Necessite prompt_toolkit + un vrai terminal ; sinon renvoie None.
+    """
+    if not (PTK_DISPO and sys.stdin.isatty()):
+        return None
+    try:
+        from prompt_toolkit.shortcuts import radiolist_dialog
+        from prompt_toolkit.styles import Style
+
+        style = Style.from_dict({
+            "dialog frame.label": f"bg:{ACCENT} #ffffff",
+            "button.focused": f"bg:{ACCENT} #ffffff",
+            "radio-selected": f"{ACCENT}",
+        })
+        return radiolist_dialog(
+            title=titre, text=texte, values=options, default=defaut, style=style
+        ).run()
+    except Exception:
+        return None
+
+
 def demander_texte(invite: str) -> str:
     """Pose une question texte simple (sans cadre ni auto-completion)."""
     if RICH_DISPO:
         return _console.input(f"[bold {ACCENT}]{invite}[/] ").strip()
     return input(f"  {invite} ").strip()
+
+
+def lire_multiligne(sentinelle: str = ".") -> str:
+    """
+    Lit plusieurs lignes au clavier jusqu'a une ligne contenant SEULEMENT la
+    sentinelle (ex. '.') ou jusqu'a Ctrl-D (EOF). Retourne le texte assemble.
+    Alternative a l'editeur externe : pas d'editeur a ouvrir/fermer.
+    KeyboardInterrupt (Ctrl-C) remonte a l'appelant (annulation).
+    """
+    lignes: list[str] = []
+    while True:
+        try:
+            ligne = input()
+        except EOFError:  # Ctrl-D -> fin de saisie
+            break
+        if ligne.strip() == sentinelle:
+            break
+        lignes.append(ligne)
+    return "\n".join(lignes)
 
 
 def image_jointe(nom: str) -> None:
@@ -401,6 +595,16 @@ def astuce_modes(categorie: str = "") -> None:
         print(f"  {texte}")
 
 
+def niveau_thinking(niveau: str) -> None:
+    """Affiche le niveau de reflexion courant (apres un changement)."""
+    if RICH_DISPO:
+        _console.print(
+            f"[bold {ACCENT}]🧠 Thinking level:[/] [bold]{niveau}[/]"
+        )
+    else:
+        print(f"  Thinking level: {niveau}")
+
+
 def mode_actuel() -> None:
     """Affiche le mode d'approbation courant (apres un changement)."""
     nom = modes.label()
@@ -492,10 +696,12 @@ COMMANDES = [
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),
-    ("/compose", "Open an editor to write/paste a long message or code block"),
+    ("/compose", "Open an editor for a long message / code block"),
+    ("/write", "Type a multi-line message inline (end with a '.' line)"),
     ("/paste", "Send the image from your clipboard"),
     ("/create-image", "Generate an image from a text description"),
     ("/mode", "Cycle approval mode (or Shift+Tab): normal / edits / plan / all"),
+    ("/think", "Pick reasoning effort with arrows (low → ultra)"),
     ("/continue", "Resume an interrupted task / previous session"),
     ("/reset", "Clear the conversation history"),
     ("/exit, /quit", "Quit the program"),
@@ -639,8 +845,41 @@ def panneau_confirmation(titre: str, details: str, dangereux: bool = False) -> N
         print()
 
 
-def lire_oui_non(invite: str = "Confirm?") -> str:
-    """Lit une reponse de confirmation (retourne la chaine brute, minuscules)."""
+def _mode_couvre(categorie: str) -> bool:
+    """Le mode courant auto-approuve-t-il une action de cette categorie ?"""
+    if categorie == "edit":
+        return modes.auto_edits()
+    return modes.auto_tout()  # "command" ou generique -> seul auto-all couvre
+
+
+def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
+    """
+    Lit une reponse de confirmation (y/n). Shift+Tab change le mode
+    d'approbation A LA VOLEE ; si le nouveau mode auto-approuve CETTE action,
+    la confirmation est acceptee directement (retourne 'y').
+    """
+    if PTK_DISPO and sys.stdin.isatty():
+        try:
+            kb = KeyBindings()
+
+            @kb.add("s-tab")
+            def _(event):
+                modes.cycler()
+                if _mode_couvre(categorie):
+                    event.app.exit(result="y")  # auto-approuve tout de suite
+                else:
+                    run_in_terminal(mode_actuel)
+
+            texte = PromptSession(key_bindings=kb).prompt(
+                HTML(f'<b><style fg="{ACCENT}">{invite}</style></b> '
+                     f'<style fg="{DIM}">(y/n · Shift+Tab: mode)</style> ')
+            )
+            return (texte or "").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            raise
+        except Exception:
+            pass  # souci ptk -> on retombe sur les modes simples ci-dessous
+
     if RICH_DISPO:
         return _console.input(
             f"[bold {ACCENT}]{invite}[/] [{DIM}](y/n)[/] "

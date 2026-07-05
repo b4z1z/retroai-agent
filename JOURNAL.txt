@@ -1607,3 +1607,136 @@ FICHIERS :
 BUT : coller du code / long texte sans encombrer l'invite (probleme scroll).
 VERIF : compose renvoie le texte (faux editeur) ; defaut notepad ; 15 tests OK.
 ETAT : TERMINEE (a tester en reel avec nano/notepad).
+
+  AJOUTS /compose :
+   - /compose <texte> : pre-remplit l'editeur (composer_dans_editeur(initial)).
+   - Message tres long (>=500 chars OU >=6 lignes) tape a l'invite -> ouverture
+     auto de l'editeur pre-rempli (_est_long + _editer_si_long dans main).
+     Pas d'editeur dispo -> envoi tel quel. Vide -> annule.
+   - VS Code : EDITOR="code -w".
+
+  AJOUTS :
+   - /compose : apres l'editeur, demande une NOTE optionnelle (placee avant le
+     bloc) -> _ajouter_note().
+   - /write : saisie MULTI-LIGNE inline (ui.lire_multiligne) terminee par une
+     ligne '.' ou Ctrl-D ; alternative a l'editeur externe (rien a fermer).
+     Ctrl-C annule. Ajoute au menu + AIDE_LOGICIEL.
+
+  DECISION : Shift+Enter impossible (prompt_toolkit refuse 's-enter' + terminaux
+  n'en distinguent pas le code) -> multi-ligne = Alt+Entree (+ /write). Auto-
+  ouverture editeur retiree. /compose mis EN COURS DE DEV (stub ui.en_developpement,
+  "(coming soon)" dans /help et AIDE_LOGICIEL) ; code editeur garde dans files.py
+  pour plus tard.
+
+  /add-file : verifie de bout en bout (chemin fourni -> contenu + consigne
+  assembles et envoyes). Marche aussi en direct "/add-file <chemin>" si le
+  selecteur tkinter n'est pas dispo (python3-tk).
+  /write : passe EN COURS DE DEV (stub en_developpement, "(coming soon)") ;
+  multi-ligne via Alt+Entree. Lecteur ui.lire_multiligne garde pour plus tard.
+
+  FIX REGRESSION : "/add-file ne fait rien" -> cause = multiline=True + override
+  de la touche Entree (experimentation multi-ligne) qui empechait l'envoi des
+  commandes. Revert a la saisie fiable (Entree=envoi, seul Shift+Tab garde).
+  Multi-ligne Alt+Entree mis de cote (a reprendre). + selecteur de fichier
+  force au premier plan (focus_force/update, parent=racine) pour /add-file et
+  /add-image, + repli "demander le chemin" si pas de dialogue, + nettoyage des
+  guillemets autour du chemin.
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Niveaux de reflexion /think (low..ultra)
+----------------------------------------------------------------
+  thinking.py (NOUVEAU) : NIVEAUX low/medium/high/highx/ultra ; est_actif()
+  (thinking ON/OFF) + consigne() (effort injecte au message). kimi n'ayant
+  qu'un thinking ON/OFF, on simule les niveaux.
+  config.py : champ thinking_level (THINKING_LEVEL env, sinon derive de
+  ENABLE_THINKING). api_client : payload thinking selon le niveau. agent_loop :
+  injecte la consigne d'effort par message. main : /think <niveau>|cycle +
+  persiste dans .env. ui : niveau_thinking() + /think au menu. AIDE_LOGICIEL.
+  ULTRA regle pour la QUALITE DU CODE (complet/runnable, edge cases, idiomes,
+  compile mentalement). max_tokens illimite -> code non coupe.
+  VERIF : niveaux OK, payload OK, 15 tests OK.
+
+  FIX #1 (mot coupe en mode fenetre) : rich rendait des lignes plus larges que
+  la fenetre visible (largeur buffer) -> terminal coupait au milieu des mots.
+  ui._largeur_visible() (os.get_terminal_size = fenetre visible) + 
+  ui._rafraichir_console() (recree Console(width=visible)) appele a chaque tour
+  dans lire_saisie -> suit le resize, retour a la ligne sur mots entiers. Cadre
+  saisie / au_revoir alignes (marge 1 colonne).
+
+  DECISION #1 (suite) : le word-wrap de la LIGNE DE SAISIE n'est pas supporte
+  par prompt_toolkit (coupe au caractere ; cf issue #1068). Claude Code y arrive
+  car il est en Node/Ink (composant maison). On GARDE le char-wrap (cosmetique,
+  texte envoye correct). -> IDEE FUTURE : composant de saisie word-wrap maison.
+  (Le word-wrap de la SORTIE rich, lui, est corrige.)
+
+  FIX timeout : requete API timeout 120->300s, configurable (REQUEST_TIMEOUT,
+  config.request_timeout). TimeoutApiError(ApiError) ; _appel_api NE reessaie
+  PLUS un timeout (re-attente inutile). Message d'aide (baisser /think, monter
+  REQUEST_TIMEOUT, decouper). IDEE FUTURE : streaming (sortie au fil de l'eau,
+  pas de timeout, feedback live).
+  + /add-file CONFIRME fonctionnel en reel (pingpong.asm 6822 chars joint).
+
+
+----------------------------------------------------------------
+[2026-06-21] ETAPE - Streaming des reponses (anti-timeout, façon Claude)
+----------------------------------------------------------------
+  config.stream (STREAM env, defaut true). api_client : chat() dispatche
+  _chat_simple (ancien) / _chat_stream (SSE). _lire_flux() accumule texte +
+  tool_calls (fragments) et appelle on_texte(fragment) -> meme structure de
+  reponse (agent_loop inchange). ui.creer_stream_printer() (printer+cloturer)
+  affiche le texte BRUT en direct (en-tete a la 1ere fois). agent_loop._appel_api :
+  branche streaming (pas de spinner/retry ; Ctrl+C reactif car flux frequent) ;
+  flag _stream_affiche. main : ne reaffiche pas si deja streame.
+  /think selecteur a fleches (ui.selecteur via radiolist_dialog) + DESCRIPTIONS.
+  Timeout requete 300s configurable (REQUEST_TIMEOUT) ; TimeoutApiError pas
+  reessaye. BUT du streaming : repond au besoin "partie par partie, appels pas
+  longs" (la reponse arrive en continu, plus de timeout).
+  VERIF : parseur SSE (texte+tool_calls) OK ; 15 tests OK.
+
+  Streaming UX : ajout d'un spinner _Attente (thread) "Thinking… (Ctrl+C)"
+  affiche AVANT le 1er fragment (sinon ca paraissait fige, surtout /think ultra).
+  S'efface au 1er morceau de reponse. creer_stream_printer gere spinner +
+  affichage. Repli STREAM=false si le SSE de NIM ne marche pas.
+
+  Comportement "ecrit dans le fichier" (facon Claude) : SYSTEME demande
+  d'utiliser write_file (sauver le resultat) au lieu d'imprimer tout le code
+  dans le chat quand on demande de creer/modifier/ameliorer un fichier.
+  files.construire_message_fichier inclut le CHEMIN ABSOLU + consigne "save with
+  write_file to this exact path". tools.write_file : apercu elargi (1500 chars
+  + nb lignes) pour VOIR le code. Astuce : Shift+Tab auto-accept edits = ecrit
+  sans confirmer.
+
+----------------------------------------------------------------
+[2026-07-05] PASSE UX STREAMING (fable 5) - polish complet
+----------------------------------------------------------------
+  1. THINKING VISIBLE EN DIRECT : _lire_flux extrait delta.reasoning_content
+     (ou .reasoning) et l'envoie au printer avec reflexion=True. Le printer
+     affiche : spinner -> en-tete "✻ Thinking…" + raisonnement EN GRIS (ANSI 90)
+     au fil de l'eau -> en-tete "⏺ BAZIZ.IA" + reponse. Le raisonnement n'est
+     PAS conserve dans l'historique (pas de bloat contexte).
+  2. FIX messages synthetiques avales : "[Limit reached...]" et "[cut off...]"
+     forcaient _stream_affiche=False -> main les affiche meme en streaming.
+  3. Header SSE : Accept: text/event-stream sur la requete stream.
+  4. (tour precedent) MAX_ITERATIONS 10->25 configurable + consigne "write the
+     file ONCE then STOP" contre les boucles d'outils.
+  VERIF : mock SSE raisonnement+reponse+tool_calls OK ; raisonnement absent du
+  content ; cloturer() True seulement si reponse affichee ; 15 tests OK.
+  A VALIDER EN REEL : rendu du thinking gris + ecriture fichier en 1 passe.
+
+----------------------------------------------------------------
+[2026-07-05] ETAPE - Finition /compose + /write + tests + validation reelle
+----------------------------------------------------------------
+  /compose TERMINE : fichier temp DEDIE (fermer sa fenetre/onglet ne touche
+  pas aux autres fichiers ; VS Code EDITOR="code -w" n'attend que cet onglet).
+  Ligne d'instructions MARQUEUR_COMPOSE en tete, retiree a l'envoi. Lecture
+  utf-8-sig (BOM notepad) + normalisation CRLF. /compose <texte> pre-remplit.
+  /write TERMINE : multi-ligne inline, fin par ligne '.' seule ou Ctrl-D,
+  Ctrl-C annule. Menu /help et AIDE_LOGICIEL mis a jour (plus de coming soon).
+  TESTS : +4 fichiers (test_api_client : flux SSE texte/raisonnement/outils,
+  saturation, extraction image ; test_modes ; test_thinking ; test_files :
+  lecture + compose BOM/CRLF/marqueur via faux editeur). 15 -> 40 PASSED.
+  VALIDATION REELLE (API NVIDIA) : chat streaming OK — 4 fragments de
+  raisonnement + reponse assemblee correcte + finish stop. Le thinking gris
+  s'affichera bien en live.
+  ETAT : TERMINE ET VALIDE.
