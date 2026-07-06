@@ -1755,3 +1755,23 @@ ETAT : TERMINEE (a tester en reel avec nano/notepad).
     Progression sauvegardee a chaque etape (reprise /continue).
     Regle FILES reformulee par fichier ("write each file ONCE").
   VERIF : raisonnement invisible, spinner avec secondes, reponse OK ; 40 tests.
+
+----------------------------------------------------------------
+[2026-07-06] FIX - Changer de mode pendant une confirmation ne marchait pas
+----------------------------------------------------------------
+  PROBLEME : l'astuce affichee disait "Shift+Tab (ou /mode)" pendant une
+  confirmation, mais (1) Shift+Tab depend du terminal (peut ne rien envoyer
+  de distinct, silencieusement avale par le except Exception:pass), et
+  (2) taper "/mode" au prompt y/n n'etait lu que comme texte brut -> aucun
+  effet, refus par defaut. L'utilisateur ne pouvait donc PAS changer de mode
+  en pleine confirmation malgre ce que disait l'astuce.
+  FIX : lire_oui_non() reconnait desormais "m", "mode" et "/mode" (fiable dans
+  TOUT terminal, ne depend d'aucun keybinding) -> cycle le mode, affiche-le,
+  et si le nouveau mode couvre DEJA cette confirmation -> approuve direct
+  ('y'). Sinon la question est reposee (boucle). Shift+Tab reste cable (il
+  insere 'm' et valide -> rejoint le meme chemin). astuce_modes() reformulee
+  ("type 'm' (or Shift+Tab)").
+  TESTS : 5 nouveaux (tests/test_modes.py) simulant plusieurs reponses stdin
+  (1 cran suffisant, alias /mode, cycle jusqu'a couverture, mode non-couvrant
+  reposant la question, reponse normale sans cycler). 40 -> 45 tests, tous OK.
+  ETAT : TERMINEE ET VALIDEE.

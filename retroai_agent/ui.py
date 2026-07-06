@@ -568,13 +568,13 @@ def astuce_modes(categorie: str = "") -> None:
     fichiers ; les commandes shell ne sont sautees que par 'auto-accept all'.
     """
     if categorie == "edit":
-        texte = ("Tip: Shift+Tab (or /mode) → 'auto-accept edits' (or 'all') "
-                 "to stop confirming file writes.")
+        texte = ("Tip: type 'm' (or Shift+Tab) → 'auto-accept edits' (or "
+                 "'all') to stop confirming file writes.")
     elif categorie == "command":
-        texte = ("Tip: Shift+Tab (or /mode) → 'auto-accept all' to stop "
+        texte = ("Tip: type 'm' (or Shift+Tab) → 'auto-accept all' to stop "
                  "confirming commands ('auto-accept edits' covers file writes only).")
     else:
-        texte = ("Tip: Shift+Tab (or /mode) → auto-accept to skip these "
+        texte = ("Tip: type 'm' (or Shift+Tab) → auto-accept to skip these "
                  "prompts, or plan mode.")
     if RICH_DISPO:
         _console.print(f"[{DIM}]{texte}[/]")
@@ -839,11 +839,17 @@ def _mode_couvre(categorie: str) -> bool:
     return modes.auto_tout()  # "command" ou generique -> seul auto-all couvre
 
 
-def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
+# Reponses qui, tapees a une confirmation, cyclent le mode d'approbation.
+# Fiable dans TOUT terminal (contrairement a Shift+Tab, qui depend de ce que
+# le terminal transmet et peut ne pas marcher partout) : c'est du texte simple.
+_DECLENCHEURS_MODE = ("m", "mode", "/mode")
+
+
+def _lire_reponse_brute(invite: str) -> str:
     """
-    Lit une reponse de confirmation (y/n). Shift+Tab change le mode
-    d'approbation A LA VOLEE ; si le nouveau mode auto-approuve CETTE action,
-    la confirmation est acceptee directement (retourne 'y').
+    Lit UNE ligne de reponse a la confirmation. Avec prompt_toolkit, Shift+Tab
+    est aussi cable : il insere 'm' et valide, pour rejoindre le meme chemin
+    que taper 'm' a la main (voir lire_oui_non). Repli rich/input sinon.
     """
     if PTK_DISPO and sys.stdin.isatty():
         try:
@@ -851,24 +857,43 @@ def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
 
             @kb.add("s-tab")
             def _(event):
-                modes.cycler()
-                if _mode_couvre(categorie):
-                    event.app.exit(result="y")  # auto-approuve tout de suite
-                else:
-                    run_in_terminal(mode_actuel)
+                buf = event.current_buffer
+                buf.text = "m"
+                buf.validate_and_handle()
 
-            texte = PromptSession(key_bindings=kb).prompt(
+            return PromptSession(key_bindings=kb).prompt(
                 HTML(f'<b><style fg="{ACCENT}">{invite}</style></b> '
-                     f'<style fg="{DIM}">(y/n · Shift+Tab: mode)</style> ')
+                     f'<style fg="{DIM}">(y/n · Shift+Tab or type m: change mode)</style> ')
             )
-            return (texte or "").strip().lower()
         except (EOFError, KeyboardInterrupt):
             raise
         except Exception:
-            pass  # souci ptk -> on retombe sur les modes simples ci-dessous
+            pass  # souci ptk -> repli ci-dessous
 
     if RICH_DISPO:
         return _console.input(
-            f"[bold {ACCENT}]{invite}[/] [{DIM}](y/n)[/] "
-        ).strip().lower()
-    return input(f"  {invite} (y/n) ").strip().lower()
+            f"[bold {ACCENT}]{invite}[/] [{DIM}](y/n · type m: change mode)[/] "
+        )
+    return input(f"  {invite} (y/n · type m: change mode) ")
+
+
+def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
+    """
+    Lit une reponse de confirmation (y/n). Taper 'm' (ou '/mode', ou faire
+    Shift+Tab si dispo) cycle le mode d'approbation SANS quitter la
+    confirmation ; si le nouveau mode couvre cette action, elle est
+    auto-approuvee tout de suite. Sinon la question est reposee.
+    """
+    while True:
+        try:
+            brute = _lire_reponse_brute(invite)
+        except (EOFError, KeyboardInterrupt):
+            raise
+        reponse = (brute or "").strip().lower()
+        if reponse in _DECLENCHEURS_MODE:
+            modes.cycler()
+            mode_actuel()
+            if _mode_couvre(categorie):
+                return "y"
+            continue  # re-pose la question avec le nouveau mode
+        return reponse
