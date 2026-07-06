@@ -22,7 +22,6 @@ PIEGE des arguments :
 from __future__ import annotations
 
 import json
-import os
 import threading
 
 from .api_client import ApiClient, ApiError, TimeoutApiError
@@ -32,10 +31,7 @@ from . import ui
 from . import images
 from . import modes
 from . import thinking
-
-
-# Fichier local de sauvegarde de la conversation (pour /continue).
-CHEMIN_SESSION = "session_history.json"
+from . import sessions
 
 
 # Message systeme : definit le role et le comportement de l'agent.
@@ -125,13 +121,22 @@ AIDE_LOGICIEL = (
     "action is confirmed, the default), auto-accept edits (file writes are "
     "auto-approved, shell still confirmed), plan mode (read-only: the agent "
     "investigates and proposes a plan without changing anything), auto-accept "
-    "all (everything runs without confirmation). The active mode (when not "
-    "normal) is shown in the bottom bar.\n"
+    "all (everything runs without confirmation). During any confirmation "
+    "prompt, typing 'm' (or '/mode') also cycles the mode right there.\n"
     "- /think : set the reasoning effort level — low, medium, high, highx, "
     "ultra ('/think high' to set, '/think' to cycle). Higher = the agent "
     "thinks more thoroughly (slower); low = fast and direct.\n"
-    "- /continue : resume an interrupted task or the previous session.\n"
-    "- /reset : clear the conversation history.\n"
+    "- /continue : resume an interrupted task, or (if nothing was "
+    "interrupted) reload the most recently saved session.\n"
+    "- /sessions : list all saved conversations (title, date, message count) "
+    "and switch to any of them — nothing is ever lost when switching, every "
+    "session is saved automatically after each turn.\n"
+    "- /new : start a brand-new empty session. The previous conversation "
+    "is NOT deleted — it stays saved and reachable via /sessions.\n"
+    "- /reset : clear the current conversation. Same effect as /new (the "
+    "old conversation is kept, safely, as a separate session).\n"
+    "- /tuto : replay the short interactive getting-started tour (also shown "
+    "automatically once, the very first time the app is used).\n"
     "- /exit or /quit : quit the program.\n"
     "To send an image FOR YOU TO ANALYZE: use /add-image, or /paste, or simply "
     "mention an existing image file path (or an http(s) image URL) inside your "
@@ -166,15 +171,29 @@ class AgentLoop:
         # Vrai si la derniere reponse a deja ete affichee en direct (streaming)
         # -> main n'a pas a la reafficher.
         self._stream_affiche = False
+        # Identite de la session COURANTE (multi-conversations, voir sessions.py).
+        # None = session neuve, jamais encore sauvegardee (un id est genere au
+        # tout premier sauver_session()). session_titre est fige au 1er
+        # message utilisateur pour rester stable au fil des sauvegardes.
+        self.session_id: str | None = None
+        self.session_titre: str | None = None
         self.reset()
 
     def reset(self) -> None:
-        """Vide l'historique et reinjecte le message systeme (commande /reset)."""
+        """
+        Vide l'historique et reinjecte le message systeme (commande /reset
+        ou /new). IMPORTANT : detache aussi la session courante (session_id
+        remis a None) -> la PRECEDENTE conversation reste intacte sur disque
+        (listable/reprenable via /sessions) au lieu d'etre ecrasee par du vide
+        au prochain autosave.
+        """
         contenu = SYSTEME + "\n\n" + A_PROPOS + "\n\n" + AIDE_LOGICIEL
         if self.infos_utilisateur:
             contenu = contenu + "\n\n" + self.infos_utilisateur
         self.historique = [{"role": "system", "content": contenu}]
         self.tour_incomplet = False
+        self.session_id = None
+        self.session_titre = None
 
     # ------------------------------------------------------------------ #
     #  Parsing robuste des arguments d'un tool call                      #
@@ -194,41 +213,43 @@ class AgentLoop:
         return donnees
 
     # ------------------------------------------------------------------ #
-    #  Persistance de la conversation (commande /continue)               #
+    #  Persistance multi-conversations (sessions.py) : /continue,        #
+    #  /sessions, /new                                                   #
     # ------------------------------------------------------------------ #
-    def sauver_session(self, chemin: str = CHEMIN_SESSION) -> None:
-        """Enregistre l'historique sur disque (echec silencieux si impossible).
+    def sauver_session(self) -> None:
+        """
+        Enregistre l'historique dans le fichier de LA session courante
+        (echec silencieux si impossible). Genere un id + un titre au tout
+        premier appel pour une session neuve ; les reutilise ensuite pour
+        toujours ecraser le MEME fichier (pas de doublons a chaque tour).
 
         Les images base64 sont allegees avant ecriture pour ne pas gonfler
-        session_history.json (voir images.alleger_pour_disque).
+        le fichier de session (voir images.alleger_pour_disque).
         """
-        try:
-            with open(chemin, "w", encoding="utf-8") as f:
-                json.dump(
-                    images.alleger_pour_disque(self.historique),
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-        except OSError:
-            pass
+        if self.session_id is None:
+            self.session_id = sessions.generer_id()
+        if self.session_titre is None:
+            self.session_titre = sessions.deriver_titre(self.historique)
+        sessions.sauver(
+            self.session_id,
+            images.alleger_pour_disque(self.historique),
+            self.session_titre,
+        )
 
-    def charger_session(self, chemin: str = CHEMIN_SESSION) -> bool:
+    def charger_session_id(self, id_session: str) -> bool:
         """
-        Recharge un historique sauvegarde. Retourne True si une session
-        valide a ete restauree, False sinon.
+        Remplace l'historique courant par celui d'une session sauvegardee
+        (utilise par /continue et /sessions). Retourne True si trouvee et
+        valide, False sinon (rien n'est modifie dans ce cas).
         """
-        if not os.path.exists(chemin):
+        donnees = sessions.charger(id_session)
+        if donnees is None:
             return False
-        try:
-            with open(chemin, "r", encoding="utf-8") as f:
-                donnees = json.load(f)
-        except (OSError, ValueError):
-            return False
-        if isinstance(donnees, list) and donnees:
-            self.historique = donnees
-            return True
-        return False
+        self.historique = donnees["historique"]
+        self.session_id = donnees["id"]
+        self.session_titre = donnees.get("titre")
+        self.tour_incomplet = False
+        return True
 
     # ------------------------------------------------------------------ #
     #  Appel API avec un reessai automatique (timeout / erreur reseau)   #

@@ -26,12 +26,15 @@ from . import image_gen
 from . import files
 from . import modes
 from . import thinking
+from . import sessions
+from . import tuto
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
     """Boucle principale : lit les saisies et y repond jusqu'a /exit."""
     ui.banniere(modele)
     ui.saluer(pseudo)
+    tuto.jouer()  # ne joue que si jamais vu ; instantane sinon (aucun appel API)
 
     while True:
         # 1. Lire la saisie utilisateur (gerer Ctrl+C / Ctrl+D proprement).
@@ -53,7 +56,8 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/reset":
             agent.reset()
-            ui.info("History cleared.")
+            ui.info("History cleared — the previous conversation is safely "
+                    "saved (/sessions to see it).")
             continue
         if saisie == "/mode" or saisie.startswith("/mode "):
             # /mode -> passe au mode suivant ; /mode <nom> -> fixe directement.
@@ -97,24 +101,18 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             ui.niveau_thinking(agent.config.thinking_level)
             continue
         if saisie == "/continue":
-            # Cas 1 : un tour de la session COURANTE a ete interrompu (echec
-            # API) -> on reprend exactement la ou ca s'est arrete.
-            if agent.tour_incomplet:
-                ui.info("Resuming interrupted task…")
-                _traiter_reponse(agent, reprise=True)
-            # Cas 2 : pas d'interruption en memoire -> on recharge le disque.
-            elif agent.charger_session():
-                ui.info(
-                    f"Previous session restored "
-                    f"({len(agent.historique)} messages)."
-                )
-                # Si la session rechargee est incomplete (dernier message =
-                # utilisateur sans reponse), on reprend la tache.
-                if agent.historique and agent.historique[-1].get("role") == "user":
-                    ui.info("Incomplete task detected — resuming…")
-                    _traiter_reponse(agent, reprise=True)
-            else:
-                ui.info("No previous session to restore.")
+            _gerer_continue(agent)
+            continue
+        if saisie == "/sessions" or saisie.startswith("/sessions "):
+            _gerer_sessions(agent)
+            continue
+        if saisie == "/new":
+            agent.reset()
+            ui.info("Started a new session — the previous one is safely saved "
+                    "(/sessions to see it).")
+            continue
+        if saisie == "/tuto":
+            tuto.jouer(force=True)
             continue
         if saisie == "/add-image":
             _envoyer_avec_image(agent, images.choisir_image_dialogue(),
@@ -163,6 +161,72 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         #    dans agent_loop). Pour un message multi-ligne, utiliser Alt+Entree
         #    (retour a la ligne) puis Entree pour envoyer, ou /write, ou /compose.
         _traiter_reponse(agent, saisie=saisie)
+
+
+def _gerer_continue(agent: AgentLoop) -> None:
+    """
+    Commande /continue :
+      - Cas 1 : un tour de la session COURANTE a ete interrompu (echec API)
+        -> on reprend exactement la ou ca s'est arrete.
+      - Cas 2 : pas d'interruption en memoire -> reprend la session
+        sauvegardee la PLUS RECENTE (multi-conversations).
+    """
+    if agent.tour_incomplet:
+        ui.info("Resuming interrupted task…")
+        _traiter_reponse(agent, reprise=True)
+        return
+
+    recentes = sessions.lister()
+    if not recentes:
+        ui.sessions_vides()
+        return
+    agent.charger_session_id(recentes[0]["id"])
+    ui.session_restauree(agent.session_titre, len(agent.historique))
+    _reprendre_si_incomplete(agent)
+
+
+def _reprendre_si_incomplete(agent: AgentLoop) -> None:
+    """
+    Apres avoir charge une session (/continue ou /sessions), si son dernier
+    message est un message UTILISATEUR sans reponse (tache interrompue avant
+    d'etre sauvegardee en plein tour), on la reprend automatiquement.
+    """
+    if agent.historique and agent.historique[-1].get("role") == "user":
+        ui.info("Incomplete task detected — resuming…")
+        _traiter_reponse(agent, reprise=True)
+
+
+def _gerer_sessions(agent: AgentLoop) -> None:
+    """
+    Commande /sessions : liste les conversations sauvegardees (menu a
+    fleches) et charge celle choisie. La session courante n'est jamais
+    perdue : elle est deja sauvegardee en continu (autosave apres chaque
+    tour), donc changer de session est toujours sans risque.
+    """
+    disponibles = sessions.lister()
+    if not disponibles:
+        ui.sessions_vides()
+        return
+
+    options = [
+        (s["id"], ui.libelle_session(s, id_courant=agent.session_id))
+        for s in disponibles
+    ]
+    choix = ui.selecteur(
+        "Sessions",
+        "Pick a session to resume (↑/↓ then Enter, Esc to cancel):",
+        options,
+        defaut=agent.session_id or disponibles[0]["id"],
+    )
+    if not choix:
+        return  # annule (Esc) ou selecteur indisponible -> rien ne change
+    if choix == agent.session_id:
+        ui.info("Already on this session.")
+        return
+
+    agent.charger_session_id(choix)
+    ui.session_restauree(agent.session_titre, len(agent.historique))
+    _reprendre_si_incomplete(agent)
 
 
 def _envoyer_avec_image(agent: AgentLoop, chemin, *, source: str) -> None:
@@ -432,6 +496,10 @@ def main() -> None:
 
     # Genere/actualise le fichier de reference des commandes (facon 'help').
     ui.exporter_commandes()
+
+    # Recupere l'ancien fichier de conversation unique (avant le multi-
+    # session) dans le nouveau systeme, une seule fois, sans perte.
+    sessions.migrer_ancienne_session()
 
     # Premier lancement : proposer (avec consentement) de renseigner un profil
     # pour personnaliser l'experience. Memorise pour ne plus redemander ensuite.

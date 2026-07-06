@@ -530,6 +530,76 @@ def menu_image(courant: str, gemini_pret: bool) -> None:
         print(f"    3) Nano Banana Flash Google · faster{note_gemini}")
 
 
+def libelle_session(session: dict, id_courant: str | None = None) -> str:
+    """
+    Construit le libelle d'une session pour le selecteur /sessions :
+    titre tronque + date + nb de messages, avec un marqueur si c'est la
+    session actuellement ouverte.
+    """
+    marque = "→ " if session["id"] == id_courant else "  "
+    date = session.get("maj", "")[:16].replace("T", " ")  # "2026-07-06 20:15"
+    titre = session.get("titre", "New session")
+    return f"{marque}{titre:<40} {date}  · {session.get('nb_messages', 0)} msgs"
+
+
+def sessions_vides() -> None:
+    """Aucune session sauvegardee (ni en cours, ni sur disque)."""
+    info("No saved sessions yet. Just start chatting — it's saved automatically.")
+
+
+def session_restauree(titre: str, nb_messages: int) -> None:
+    """Confirme le chargement d'une session (via /continue ou /sessions)."""
+    if RICH_DISPO:
+        _console.print(
+            f"[{SUCCES}]↺ Session restored:[/] [bold]{titre}[/] "
+            f"[{DIM}]({nb_messages} messages)[/]"
+        )
+    else:
+        print(f"  [Session restored: {titre} ({nb_messages} messages)]")
+
+
+def panneau_info(titre: str, lignes: list, etape: str = "") -> None:
+    """
+    Panneau d'information generique (non lie a une confirmation) : utilise
+    par le tutoriel /tuto pour ses ecrans successifs.
+    """
+    if RICH_DISPO:
+        contenu = Text()
+        if etape:
+            contenu.append(f"{etape}\n\n", style=DIM)
+        contenu.append(f"{titre}\n\n", style=f"bold {ACCENT}")
+        for ligne in lignes:
+            contenu.append(f"{ligne}\n", style="default")
+        _console.print()
+        _console.print(Panel(contenu, border_style=ACCENT, padding=(1, 4), expand=True))
+    else:
+        print()
+        if etape:
+            print(f"[{etape}]")
+        print(f"=== {titre} ===")
+        for ligne in lignes:
+            print(f"  {ligne}")
+
+
+def pause(invite: str = "Press Enter to continue (type 'skip' to exit the tour):") -> str:
+    """
+    Attend une saisie (Entree ou texte) ; retourne le texte en minuscules.
+
+    Utilisee par le tutoriel (/tuto), qui doit rester 100% incassable au tout
+    premier lancement de l'app : si le flux d'entree n'est pas lisible pour
+    QUELQUE raison que ce soit (EOFError classique, mais aussi OSError dans
+    certains environnements non-interactifs ou stdin redirige/ferme), on
+    n'ecrase pas l'application avec une exception -> on sort proprement du
+    tutoriel (comme si l'utilisateur avait tape 'skip').
+    """
+    try:
+        if RICH_DISPO:
+            return _console.input(f"[{DIM}]{invite}[/] ").strip().lower()
+        return input(f"  {invite} ").strip().lower()
+    except (EOFError, OSError):
+        return "skip"
+
+
 def quota_atteint() -> None:
     """Avertit que le palier gratuit Gemini est epuise et liste les options."""
     if RICH_DISPO:
@@ -680,6 +750,7 @@ def reflexion(message: str = "Thinking…"):
 # handler "/" de main.py. Modifier ici suffit a tout mettre a jour.
 COMMANDES = [
     ("/help", "Show this help"),
+    ("/tuto", "Replay the interactive getting-started tour"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),
@@ -689,8 +760,10 @@ COMMANDES = [
     ("/create-image", "Generate an image from a text description"),
     ("/mode", "Cycle approval mode (or Shift+Tab): normal / edits / plan / all"),
     ("/think", "Pick reasoning effort with arrows (low → ultra)"),
-    ("/continue", "Resume an interrupted task / previous session"),
-    ("/reset", "Clear the conversation history"),
+    ("/continue", "Resume an interrupted task, or the last session"),
+    ("/sessions", "List saved conversations and switch between them"),
+    ("/new", "Start a brand-new session (previous one stays saved)"),
+    ("/reset", "Clear the conversation (same as /new)"),
     ("/exit, /quit", "Quit the program"),
 ]
 

@@ -4,8 +4,13 @@
 # Donnees personnelles : profil utilisateur local.
 user_profile.json
 
-# Historique de conversation sauvegarde (pour /continue).
-session_history.json
+# Conversations sauvegardees (multi-sessions, /continue, /sessions, /new).
+sessions/
+# Ancien fichier unique (avant le multi-session) + sa sauvegarde de migration.
+session_history.json*
+
+# Marqueur local : le tutoriel /tuto a deja ete montre une fois.
+tuto_complete.json
 
 # Images generees par /create-image (sorties locales).
 generated_images/

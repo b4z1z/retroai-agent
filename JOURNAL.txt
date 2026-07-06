@@ -1801,3 +1801,85 @@ ETAT : TERMINEE (a tester en reel avec nano/notepad).
   demande bien confirmation ; refus n'ecrit rien ; mode plan bloque sans
   toucher au disque. 45 -> 51 tests, tous OK.
   ETAT : TERMINEE ET VALIDEE.
+
+
+----------------------------------------------------------------
+[2026-07-06] ETAPE - Multi-conversations (/sessions, /new, /continue revu)
+                      + Tutoriel terminal interactif (/tuto)
+----------------------------------------------------------------
+OBJECTIF :
+  Deux features de la roadmap : (1) plusieurs conversations sauvegardees,
+  listables et reprenables (facon Claude Code --resume) au lieu d'un seul
+  fichier ecrase a chaque fois ; (2) un tour guide au tout premier lancement.
+
+--- 1) MULTI-CONVERSATIONS -------------------------------------------------
+  sessions.py (NOUVEAU) : chaque conversation = un fichier independant
+  sessions/<id>.json {id, titre, cree, maj, historique}. Fonctions :
+  generer_id() (horodatage + suffixe anti-collision), sauver() (preserve la
+  date de creation, met a jour "maj"), charger(), lister() (triee par maj
+  decroissant, fichiers corrompus ignores), supprimer(), deriver_titre()
+  (1er VRAI message utilisateur, ignore les [Tool result:...]/[Plan mode...],
+  gere le contenu multimodal texte+image, tronque a 48 car.),
+  migrer_ancienne_session() (recupere l'ancien session_history.json unique
+  SANS PERTE, le renomme en .migrated pour ne pas re-migrer).
+
+  agent_loop.py : AgentLoop a maintenant session_id/session_titre (None =
+  session neuve). sauver_session() genere id+titre au 1er appel puis les
+  reutilise (jamais de doublon). charger_session_id(id) restaure un etat
+  complet. reset() (/reset, /new) DETACHE la session (session_id=None) au
+  lieu d'ecraser l'ancienne avec un historique vide -> l'ancienne conversation
+  reste intacte et listable via /sessions.
+
+  main.py : /continue reecrit en _gerer_continue() (tour interrompu en
+  memoire -> reprend ; sinon recharge la session la PLUS RECENTE). Nouveau
+  /sessions -> _gerer_sessions() : menu a fleches (ui.selecteur) listant
+  toutes les sessions (titre/date/nb messages, session courante marquee "→"),
+  changement sans perte (autosave deja fait a chaque tour). Nouveau /new
+  (alias explicite de reset, message different). _reprendre_si_incomplete()
+  factorisee (reprise auto si le dernier message charge est "user" sans
+  reponse). Migration appelee une fois dans main().
+
+  ui.py : libelle_session(), sessions_vides(), session_restauree() ; COMMANDES
+  mis a jour (/sessions, /new, description /continue revue).
+
+--- 2) TUTORIEL INTERACTIF (/tuto) ------------------------------------------
+  tuto.py (NOUVEAU) : 7 etapes courtes (welcome, parler a l'agent, commandes
+  sessions, fichiers/images, modes d'approbation, /think, cloture). AUCUN
+  appel API (100% hors-ligne, instantane). Se joue automatiquement UNE SEULE
+  fois (marqueur tuto_complete.json, ecrit DES LE DEBUT pour ne jamais
+  re-harceler meme si l'utilisateur quitte au milieu) ; rejouable a volonte
+  via /tuto (force=True, ne touche pas au marqueur). 'skip' ou Ctrl+C/Ctrl+D
+  interrompent proprement a tout moment.
+  ui.py : panneau_info() (ecran generique bordure rouge + etape "Step x/N"),
+  pause() (lit une reponse ; capture EOFError ET OSError -> "skip" -> le
+  tutoriel ne peut JAMAIS planter le demarrage de l'app, meme avec un stdin
+  illisible/redirige).
+  main.py : tuto.jouer() appele dans boucle_cli() juste apres l'accueil ;
+  commande /tuto (force=True).
+
+FICHIERS DE TESTS (NOUVEAUX) :
+  - test_sessions.py (16) : id unique, sauver/charger round-trip + date de
+    creation preservee, lister triee/dossier absent/fichier corrompu,
+    deriver_titre (filtre outils/plan, multimodal, defaut, troncature),
+    supprimer, migration (avec perte zero, idempotente, fichier vide ignore).
+  - test_agent_loop_sessions.py (5) : session neuve sans id, 1ere sauvegarde
+    genere id/titre stables (pas de doublon), reset() detache sans effacer
+    le disque (2 sessions distinctes cote a cote), charger_session_id
+    restaure tout, id inexistant ne modifie rien.
+  - test_main_sessions.py (10) : /continue (rien a reprendre, tour interrompu
+    en memoire, recharge la plus recente, reprise auto si incomplete),
+    /sessions (liste vide, selection change de conversation, annulation Esc,
+    choisir la session deja active, reprise auto), /new.
+  - test_tuto.py (6) : joue toutes les etapes au 1er lancement, ne se rejoue
+    pas seul, /tuto force rejoue, marque comme vu meme si sortie anticipee,
+    'skip' arrete la progression, Ctrl+C arrete proprement.
+  - test_boucle_cli_smoke.py (2) : bout-en-bout REEL via boucle_cli() ->
+    a debusque un vrai bug (ui.pause() ne capturait pas OSError, seulement
+    EOFError -> corrige).
+  51 -> 90 tests, TOUS OK. Verifie aussi le repli 100% texte (sans rich).
+
+FICHIERS MODIFIES (docs) : .gitignore (sessions/, session_history.json*,
+  tuto_complete.json), README.md (commandes, section "Sessions multiples",
+  reinitialisation, reprise apres erreur, arborescence).
+
+ETAT : TERMINEES ET VALIDEES (bout-en-bout, y compris sans rich).

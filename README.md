@@ -195,7 +195,7 @@ baziz.ia
 ```
 
 > ⚠️ **À savoir** : l'agent lit `.env`, `user_profile.json`,
-> `session_history.json` et `COMMANDES.txt` dans le **dossier courant**.
+> `sessions/` et `COMMANDES.txt` dans le **dossier courant**.
 > Lancez donc `baziz.ia` **depuis le dossier du projet** (ou définissez
 > `NVIDIA_API_KEY` comme variable d'environnement système). Si la commande
 > n'est pas reconnue, ouvrez un **nouveau terminal** (le PATH doit être
@@ -206,8 +206,11 @@ Commandes de l'interface :
 | Commande         | Effet                                                        |
 |------------------|--------------------------------------------------------------|
 | `/help`          | Affiche l'aide (liste des commandes).                        |
-| `/continue`      | Reprend une tâche interrompue ou la session précédente.      |
-| `/reset`         | Vide l'historique de conversation.                           |
+| `/tuto`          | Rejoue le tour guidé de prise en main.                       |
+| `/continue`      | Reprend une tâche interrompue, ou la session la plus récente.|
+| `/sessions`      | Liste les conversations sauvegardées et permet d'en changer. |
+| `/new`           | Démarre une nouvelle session (l'ancienne reste sauvegardée). |
+| `/reset`         | Vide la conversation courante (équivalent à `/new`).         |
 | `/exit`, `/quit` | Quitte proprement.                                           |
 
 Astuces :
@@ -215,6 +218,24 @@ Astuces :
 - Une commande partielle propose des **suggestions** (ex. `/c` → `/continue`).
 - Un fichier **`COMMANDES.txt`** est généré à la racine à chaque lancement
   (mémo de toutes les commandes, façon `help`).
+- Au **tout premier lancement**, un court **tutoriel interactif** (~1 minute,
+  aucun appel API) présente les commandes essentielles. Rejouable à tout
+  moment avec `/tuto`.
+
+### Sessions multiples (façon Claude Code)
+
+Chaque conversation est sauvegardée **automatiquement** après chaque tour
+dans son propre fichier (`sessions/<id>.json`) : rien n'est jamais perdu en
+changeant de conversation.
+
+- **`/sessions`** ouvre un menu à flèches (↑/↓, Entrée pour choisir, Échap
+  pour annuler) listant toutes vos conversations : titre (déduit du premier
+  message), date de dernière activité, nombre de messages.
+- **`/new`** démarre une conversation vierge ; l'ancienne reste intacte et
+  reste accessible via `/sessions`.
+- **`/continue`** reprend une tâche interrompue en cours, sinon recharge la
+  session la plus récente — pratique pour reprendre exactement là où vous
+  vous étiez arrêté après avoir fermé le terminal.
 
 Tapez n'importe quel autre texte pour dialoguer avec l'agent. Lorsqu'il propose
 une écriture de fichier ou une commande shell, il demande **`Confirmer ? (y/n)`** :
@@ -259,26 +280,28 @@ supprimer à tout moment. L'agent les recréera proprement au prochain lancement
 | Pour réinitialiser… | Supprimez | Effet |
 |---|---|---|
 | Le **pseudo** et les infos perso | `user_profile.json` | la question du profil est **reposée** au prochain lancement |
-| La **conversation** sauvegardée (`/continue`) | `session_history.json` | repart sur une conversation vierge |
-| **Tout** d'un coup | les deux fichiers | remise à zéro complète |
+| **Toutes les conversations** sauvegardées | le dossier `sessions/` | `/sessions` repart à vide |
+| Le **tutoriel** (le revoir au prochain lancement) | `tuto_complete.json` | le tour guidé est **rejoué automatiquement** |
+| **Tout** d'un coup | les trois | remise à zéro complète |
 
 ```bash
 # Linux / macOS
-rm user_profile.json session_history.json
+rm -r user_profile.json sessions/ tuto_complete.json
 
 # Windows (cmd / PowerShell)
-del user_profile.json session_history.json
+rmdir /s /q sessions & del user_profile.json tuto_complete.json
 ```
 
-> 💡 Pour vider seulement l'historique **sans quitter**, tapez la commande
-> `/reset` directement dans l'agent.
+> 💡 Pour démarrer une conversation vierge **sans quitter** (l'ancienne reste
+> sauvegardée), tapez `/new` ou `/reset` directement dans l'agent.
 
 ### Reprise après une erreur / un timeout
 
 Si l'API échoue (timeout, coupure réseau…), l'agent **réessaie une fois**
-automatiquement. Si l'échec persiste **en pleine tâche**, la progression
-n'est **pas perdue** : tapez **`/continue`** pour reprendre là où ça s'est
-arrêté (la conversation est sauvegardée dans `session_history.json`).
+automatiquement (sauf en streaming, où la réponse est déjà en partie affichée).
+Si l'échec persiste **en pleine tâche**, la progression n'est **pas perdue** :
+tapez **`/continue`** pour reprendre là où ça s'est arrêté (chaque conversation
+est sauvegardée automatiquement dans `sessions/<id>.json`).
 
 ---
 
@@ -294,17 +317,24 @@ retroai-agent/
  ├── JOURNAL.txt          # journal de bord (étapes, bugs, décisions)
  ├── COMMANDES.txt        # (généré) mémo des commandes, façon "help"
  ├── user_profile.json    # (généré, local) pseudo + préférences
- ├── session_history.json # (généré, local) conversation pour /continue
+ ├── tuto_complete.json   # (généré, local) marqueur : tutoriel déjà vu
+ ├── sessions/            # (généré, local) une conversation par fichier
  └── retroai_agent/
      ├── __init__.py
      ├── main.py          # point d'entrée + boucle CLI
-     ├── api_client.py    # transport HTTP NVIDIA NIM (retry/backoff)
+     ├── api_client.py    # transport HTTP NVIDIA NIM (retry/backoff, streaming)
      ├── tools.py         # schémas JSON + implémentation des 4 outils
      ├── agent_loop.py    # orchestration tool calling + historique
      ├── config.py        # configuration (variables d'environnement)
      ├── safety.py        # garde-fous et confirmations
+     ├── modes.py         # modes d'approbation (normal/auto-edit/plan/auto-all)
+     ├── thinking.py      # niveaux d'effort de réflexion (/think)
+     ├── sessions.py      # multi-conversations (/continue, /sessions, /new)
+     ├── tuto.py          # tutoriel interactif (/tuto)
      ├── profile.py       # profil utilisateur optionnel (pseudo, perso)
      ├── images.py        # support des images en entrée (vision/multimodal)
+     ├── image_gen.py     # génération d'images (/create-image, /image)
+     ├── files.py         # /add-file, /compose, /write
      └── ui.py            # affichage terminal (rich, style Claude Code)
 ```
 
