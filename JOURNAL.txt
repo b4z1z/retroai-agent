@@ -1775,3 +1775,29 @@ ETAT : TERMINEE (a tester en reel avec nano/notepad).
   (1 cran suffisant, alias /mode, cycle jusqu'a couverture, mode non-couvrant
   reposant la question, reponse normale sans cycler). 40 -> 45 tests, tous OK.
   ETAT : TERMINEE ET VALIDEE.
+
+----------------------------------------------------------------
+[2026-07-06] FIX - Auto-edit "ne marchait pas a 100%" : write_file dans un
+                    NOUVEAU dossier echouait, forcant une commande shell
+----------------------------------------------------------------
+  PROBLEME : write_file faisait juste open(path, "w"), qui LEVE une
+  FileNotFoundError si un des dossiers du chemin n'existe pas encore. Des que
+  l'utilisateur demandait un NOUVEAU projet dans un nouveau dossier (ex.
+  "cree snake_game/ avec 3 fichiers"), le premier write_file echouait ->
+  l'agent devait alors passer par run_shell_command ("mkdir") pour creer le
+  dossier -> categorie="command", PAS couverte par le mode auto-accept edits
+  (seul auto-accept all couvre les commandes) -> confirmation qui interrompt
+  quand meme le flux, alors que l'utilisateur croyait etre "sans confirmation".
+  C'etait exactement le symptome "auto edit ne marche pas a 100%".
+  FIX : tools._outil_write_file cree desormais les dossiers parents manquants
+  (os.makedirs(dossier, exist_ok=True)) AVANT d'ecrire, au meme niveau de
+  risque que l'ecriture elle-meme (deja couverte par la meme confirmation/
+  auto-edit juste au-dessus). Plus besoin d'une commande shell pour un nouveau
+  dossier -> auto-edit couvre desormais VRAIMENT tout le cycle creation-de-
+  fichiers, sans aucune interruption cachee.
+  TESTS (tests/test_tools.py, NOUVEAU, 6 tests) : creation dossier(s) imbrique(s)
+  manquant(s) ; dossier deja existant ; auto-edit ne PROVOQUE JAMAIS
+  demander_confirmation (assertion stricte via monkeypatch) ; mode normal
+  demande bien confirmation ; refus n'ecrit rien ; mode plan bloque sans
+  toucher au disque. 45 -> 51 tests, tous OK.
+  ETAT : TERMINEE ET VALIDEE.

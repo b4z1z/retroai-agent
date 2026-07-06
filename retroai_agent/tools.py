@@ -182,6 +182,14 @@ def _outil_write_file(args: dict, config: Config) -> str:
         return "Action cancelled by the user (write_file refused)."
 
     try:
+        # Cree le(s) dossier(s) parent(s) manquants (meme niveau de risque que
+        # l'ecriture elle-meme, deja couvert par la confirmation/auto-edit
+        # ci-dessus). Sans ca, ecrire dans un NOUVEAU dossier echoue et force
+        # une commande shell (mkdir) -> pas couverte par auto-edit, ce qui
+        # cassait l'experience "sans confirmation" au milieu d'une tache.
+        dossier = os.path.dirname(path)
+        if dossier:
+            os.makedirs(dossier, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
     except OSError as exc:
