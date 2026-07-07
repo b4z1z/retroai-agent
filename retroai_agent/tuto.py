@@ -43,12 +43,16 @@ ETAPES = [
         "/add-image, /paste   send an existing image for the agent to look at",
         "/image         choose the image generation model (FLUX / Nano Banana)",
     ]),
-    ("Approval modes — Shift+Tab (or type 'm')", [
+    ("Approval modes", [
         "normal              every file write / command is confirmed (default)",
         "auto-accept edits   file writes run without asking",
         "plan                read-only: the agent only plans, changes nothing",
         "auto-accept all     nothing is confirmed — use with care",
-        "During any confirmation, type 'm' (or press Shift+Tab) to switch.",
+        "",
+        "At the main prompt: press Shift+Tab, or type /mode, to switch.",
+        "During a (y/n) confirmation: type 'm' (or Shift+Tab) right there.",
+        "('m' alone only works during a confirmation — at the main prompt,",
+        " anything you type is a real message sent to the agent.)",
     ]),
     ("Reasoning effort — /think", [
         "low · medium · high · highx · ultra — how hard the model thinks.",

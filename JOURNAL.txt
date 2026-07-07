@@ -1883,3 +1883,12 @@ FICHIERS MODIFIES (docs) : .gitignore (sessions/, session_history.json*,
   reinitialisation, reprise apres erreur, arborescence).
 
 ETAT : TERMINEES ET VALIDEES (bout-en-bout, y compris sans rich).
+
+  CLARIFICATION /tuto : l'etape "Approval modes" precisait mal la portee de
+  'm' -> l'utilisateur a teste 'm' seul a l'invite NORMALE (hors confirmation)
+  et a recu "Thinking" (envoye comme un vrai message a l'agent), pense a un
+  bug. Corrige : le titre "Approval modes — Shift+Tab (or type 'm')" ->
+  "Approval modes" (neutre), et le contenu distingue clairement les 2
+  contextes : invite normale = Shift+Tab OU /mode ; confirmation (y/n)
+  uniquement = 'm' (ou /mode, ou Shift+Tab). Verifie en rendu rich + texte
+  simple ; 90 tests toujours OK.
