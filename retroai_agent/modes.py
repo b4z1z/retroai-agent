@@ -35,6 +35,23 @@ LABELS = {
     AUTO_ALL: "auto-accept all",
 }
 
+# Alias en langage naturel -> constante canonique. Necessaire car les
+# messages affiches a l'utilisateur (astuce_modes, tuto) citent des mots
+# comme "all" ou "edits" (repris des LABELS, ex. "auto-accept edits") : sans
+# ces alias, taper exactement ce qui est suggere echouait silencieusement
+# (traite comme un refus a une confirmation, ou "Unknown mode" pour /mode).
+#
+# ATTENTION : PAS d'alias a une seule lettre (ex. "n", "p") : "n" DOIT rester
+# reserve au refus d'une confirmation (y/n). Un alias "n"->normal a ete teste
+# puis retire immediatement : il interceptait le refus et re-posait la
+# question au lieu de traiter "n" comme "non". Ne pas reintroduire ce risque.
+ALIAS = {
+    "edit": AUTO_EDIT, "edits": AUTO_EDIT,
+    "auto-accept-edits": AUTO_EDIT, "accept-edits": AUTO_EDIT,
+    "all": AUTO_ALL,
+    "auto-accept-all": AUTO_ALL, "accept-all": AUTO_ALL,
+}
+
 # Etat courant (module-level).
 _courant = NORMAL
 
@@ -49,11 +66,24 @@ def label(mode: str | None = None) -> str:
     return LABELS.get(mode or _courant, mode or _courant)
 
 
+def _normaliser(texte: str) -> str:
+    """Minuscules, espaces/underscores -> tirets (ex. 'Auto Accept All' -> 'auto-accept-all')."""
+    return (texte or "").strip().lower().replace("_", "-").replace(" ", "-")
+
+
 def definir(mode: str) -> bool:
-    """Fixe le mode si valide. Retourne True si applique."""
+    """
+    Fixe le mode si 'mode' est une constante canonique (normal/auto-edit/
+    plan/auto-all) OU un alias naturel reconnu (voir ALIAS, insensible a la
+    casse/aux espaces). Retourne True si applique, False sinon (inchange).
+    """
     global _courant
-    if mode in LABELS:
-        _courant = mode
+    cle = _normaliser(mode)
+    if cle in LABELS:
+        _courant = cle
+        return True
+    if cle in ALIAS:
+        _courant = ALIAS[cle]
         return True
     return False
 

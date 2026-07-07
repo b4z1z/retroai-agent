@@ -55,6 +55,41 @@ def test_plan_est_lecture_seule():
 
 
 # --------------------------------------------------------------------------- #
+#  Alias en langage naturel (modes.definir) : "all", "edits", etc. — ce sont  #
+#  exactement les mots affiches par astuce_modes()/le tutoriel, ils doivent   #
+#  donc fonctionner tels quels quand l'utilisateur les tape.                  #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("texte,attendu", [
+    ("all", modes.AUTO_ALL),
+    ("ALL", modes.AUTO_ALL),
+    (" All ", modes.AUTO_ALL),
+    ("auto-accept-all", modes.AUTO_ALL),
+    ("auto accept all", modes.AUTO_ALL),
+    ("edit", modes.AUTO_EDIT),
+    ("edits", modes.AUTO_EDIT),
+    ("auto accept edits", modes.AUTO_EDIT),
+    ("auto-edit", modes.AUTO_EDIT),   # constante canonique, doit marcher aussi
+    ("plan", modes.PLAN),
+    ("normal", modes.NORMAL),
+])
+def test_alias_naturels_reconnus(texte, attendu):
+    assert modes.definir(texte) is True
+    assert modes.courant() == attendu
+
+
+@pytest.mark.parametrize("mot", ["n", "y", "yes", "no", "oui", "non", "o", ""])
+def test_reponses_oui_non_jamais_interceptees_comme_mode(mot):
+    """
+    REGRESSION CRITIQUE : un alias 'n' -> normal a brievement existe et
+    interceptait le refus d'une confirmation (l'utilisateur ne pouvait plus
+    taper 'n' pour refuser). Aucun mot de reponse y/n ne doit JAMAIS etre
+    reconnu comme nom de mode, quoi qu'on ajoute plus tard a ALIAS.
+    """
+    assert modes.definir(mot) is False
+    assert modes.courant() == modes.NORMAL  # inchange
+
+
+# --------------------------------------------------------------------------- #
 #  Changement de mode PENDANT une confirmation (taper 'm' / '/mode')          #
 #  Doit marcher meme sans Shift+Tab (terminal-independant).                   #
 # --------------------------------------------------------------------------- #
@@ -100,3 +135,34 @@ def test_reponse_normale_sans_cycler():
     rep = _repondre("y\n", "Write a file?", "edit")
     assert modes.courant() == modes.NORMAL  # inchange
     assert rep == "y"
+
+
+def test_taper_le_nom_du_mode_directement_bascule_dessus():
+    """
+    BUG REPRODUIT PUIS CORRIGE : l'utilisateur voit l'astuce ("... (or 'all')")
+    et tape logiquement 'all' -> avant le fix, ce n'etait reconnu par rien et
+    etait traite comme un REFUS. Doit desormais basculer direct sur ce mode.
+    """
+    rep = _repondre("all\n", "Write a file?", "edit")
+    assert modes.courant() == modes.AUTO_ALL
+    assert rep == "y"  # auto-all couvre 'edit' -> approuve tout de suite
+
+
+def test_taper_edits_bascule_sur_auto_edit():
+    rep = _repondre("edits\n", "Write a file?", "edit")
+    assert modes.courant() == modes.AUTO_EDIT
+    assert rep == "y"
+
+
+def test_taper_all_ne_couvre_pas_une_commande_a_lui_seul_si_deja_couvert():
+    """Sanity check : 'all' couvre AUSSI les commandes (auto-all = tout)."""
+    rep = _repondre("all\n", "Run a shell command?", "command")
+    assert modes.courant() == modes.AUTO_ALL
+    assert rep == "y"
+
+
+def test_taper_n_reste_un_refus_meme_apres_le_fix_des_alias():
+    """Non-regression : 'n' doit TOUJOURS etre un refus, jamais un mode."""
+    rep = _repondre("n\n", "Write a file?", "edit")
+    assert modes.courant() == modes.NORMAL  # rien n'a change
+    assert rep == "n"

@@ -952,10 +952,15 @@ def _lire_reponse_brute(invite: str) -> str:
 
 def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
     """
-    Lit une reponse de confirmation (y/n). Taper 'm' (ou '/mode', ou faire
-    Shift+Tab si dispo) cycle le mode d'approbation SANS quitter la
-    confirmation ; si le nouveau mode couvre cette action, elle est
-    auto-approuvee tout de suite. Sinon la question est reposee.
+    Lit une reponse de confirmation (y/n). Deux facons de changer de mode
+    SANS quitter la confirmation :
+      - taper 'm' (ou '/mode', ou faire Shift+Tab si dispo) -> CYCLE au mode
+        suivant ;
+      - taper le NOM d'un mode directement (ex. 'all', 'edits', 'plan',
+        'normal' — les memes mots que ceux affiches par l'astuce) -> bascule
+        DIRECTEMENT sur ce mode (voir modes.definir/ALIAS).
+    Dans les deux cas, si le nouveau mode couvre deja cette confirmation,
+    elle est auto-approuvee tout de suite ; sinon la question est reposee.
     """
     while True:
         try:
@@ -963,8 +968,15 @@ def lire_oui_non(invite: str = "Confirm?", categorie: str = "") -> str:
         except (EOFError, KeyboardInterrupt):
             raise
         reponse = (brute or "").strip().lower()
+
+        change = False
         if reponse in _DECLENCHEURS_MODE:
             modes.cycler()
+            change = True
+        elif modes.definir(reponse):
+            change = True
+
+        if change:
             mode_actuel()
             if _mode_couvre(categorie):
                 return "y"

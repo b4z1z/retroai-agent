@@ -1892,3 +1892,36 @@ ETAT : TERMINEES ET VALIDEES (bout-en-bout, y compris sans rich).
   contextes : invite normale = Shift+Tab OU /mode ; confirmation (y/n)
   uniquement = 'm' (ou /mode, ou Shift+Tab). Verifie en rendu rich + texte
   simple ; 90 tests toujours OK.
+
+----------------------------------------------------------------
+[2026-07-06] FIX - Taper le nom d'un mode ("all", "edits"...) a une
+                    confirmation etait ignore (traite comme un refus)
+----------------------------------------------------------------
+PROBLEME (repere via screenshot utilisateur) : l'astuce affichee dit
+"...'auto-accept edits' (or 'all')..." mais taper litteralement 'all' a la
+confirmation n'etait reconnu par RIEN (seuls 'm'/'mode'/'/mode' cyclaient) ->
+tombe dans le cas general -> pas "y"/"o"/"yes"/"oui" -> traite comme un
+REFUS ("Refused" + action annulee), alors que l'utilisateur voulait juste
+changer de mode. Meme trou pour /mode <arg> (ex. "/mode all" echouait aussi,
+puisque modes.definir() n'acceptait QUE les constantes exactes).
+
+FIX (source unique dans modes.py, beneficie a /mode ET aux confirmations) :
+  - ALIAS : mots naturels -> constante canonique ("all"->auto-all,
+    "edits"/"edit"->auto-edit, "auto accept all"/"auto-accept-all" etc.),
+    insensible casse/espaces/underscores (_normaliser).
+  - definir() essaie d'abord la constante canonique, puis ALIAS.
+  - ui.lire_oui_non() essaie modes.definir(reponse) en plus du cycle 'm'.
+
+BUG DECOUVERT PENDANT LE FIX (grave, corrige avant tout commit) : un alias
+'n'->normal avait ete ajoute par reflexe, MAIS 'n' est LA reponse de refus
+d'une confirmation y/n -> interceptait systematiquement le refus (au lieu de
+l'appliquer, ca re-posait la question). Retire immediatement 'n' et 'p'
+(aucun alias a une seule lettre, jamais suggere nulle part de toute facon).
+Verifie explicitement : n/y/yes/no/oui/non/o/"" ne sont JAMAIS des alias.
+
+TESTS (test_modes.py, +19) : tous les alias (casse/espaces), le refus reste
+un refus (regression critique testee explicitement), flux complet 'all' a
+une confirmation edit ET command (approuve direct), 'edits' -> auto-edit.
+Flux reel bout-en-bout verifie via tools._outil_write_file (fichier ecrit).
+90 -> 113 tests (dont 34 dans test_modes.py seul), TOUS OK.
+ETAT : TERMINEE ET VALIDEE.
