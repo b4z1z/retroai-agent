@@ -60,6 +60,50 @@ MSG_SATURATION = (
 )
 
 
+def _reparer_texte(texte: str) -> str:
+    """
+    Repare un texte pouvant contenir des "surrogates isoles" invalides
+    (U+D800-U+DFFF). Cause : en streaming SSE, un emoji/caractere multi-
+    octets peut etre COUPE EN DEUX par le decoupage en morceaux (chaque
+    moitie de la paire UTF-16 arrivant dans un fragment JSON distinct,
+    decode independamment) -> le caractere reconstitue est invalide et fait
+    planter toute ecriture UTF-8 stricte plus tard (session, prochain appel
+    API...) avec "UnicodeEncodeError: ... surrogates not allowed".
+
+    Scan CARACTERE PAR CARACTERE (pas de tentative globale encode/decode sur
+    toute la chaine : un seul orphelin ferait alors echouer - et remplacer en
+    bloc - des paires par ailleurs valides plus loin dans le meme texte) :
+      - une paire haute+basse ADJACENTE est RECOMBINEE en le vrai caractere
+        d'origine (aucune perte, c'est le cas le plus courant) ;
+      - un surrogate qui reste isole (jamais suivi/precede de son binome) est
+        remplace par le caractere de remplacement Unicode - mieux vaut perdre
+        1 glyphe que planter et perdre toute la conversation.
+    Sans effet sur un texte deja propre (idempotent).
+    """
+    resultat = []
+    i, n = 0, len(texte)
+    while i < n:
+        code = ord(texte[i])
+        if 0xD800 <= code <= 0xDBFF:  # moitie HAUTE d'une paire
+            if i + 1 < n:
+                code2 = ord(texte[i + 1])
+                if 0xDC00 <= code2 <= 0xDFFF:  # moitie BASSE valide juste apres
+                    vrai = 0x10000 + (code - 0xD800) * 0x400 + (code2 - 0xDC00)
+                    resultat.append(chr(vrai))
+                    i += 2
+                    continue
+            resultat.append("\ufffd")  # orpheline -> neutralisee
+            i += 1
+            continue
+        if 0xDC00 <= code <= 0xDFFF:  # moitie BASSE isolee (pas de haute avant)
+            resultat.append("\ufffd")
+            i += 1
+            continue
+        resultat.append(texte[i])
+        i += 1
+    return "".join(resultat)
+
+
 def _est_saturation(texte: str) -> bool:
     """
     Vrai si une reponse 5xx traduit une SATURATION TRANSITOIRE du worker NIM
@@ -327,7 +371,7 @@ class ApiClient:
         except requests.exceptions.RequestException as exc:
             raise ApiError(f"Network error during streaming: {exc}") from exc
 
-        message = {"role": "assistant", "content": contenu}
+        message = {"role": "assistant", "content": _reparer_texte(contenu)}
         if outils:
             message["tool_calls"] = [outils[i] for i in sorted(outils)]
         return {"choices": [{"message": message, "finish_reason": finish}]}

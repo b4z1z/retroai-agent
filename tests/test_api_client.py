@@ -82,3 +82,42 @@ def test_extraire_image_base64_formats():
     assert _extraire_image_base64({"image": "CCC"}) == "CCC"
     with pytest.raises(ApiError):
         _extraire_image_base64({"foo": 1})
+
+
+# --------------------------------------------------------------------------- #
+#  REGRESSION - crash reel : le streaming SSE peut couper un emoji en 2       #
+#  moitiees de paire UTF-16, chacune arrivant dans une ligne "data:" distincte#
+#  (donc decodee separement par json.loads()). Le contenu reconstitue via    #
+#  simple concatenation contenait alors un "surrogate isole" invalide, qui    #
+#  faisait planter sessions.sauver() plus tard (UnicodeEncodeError). _lire_   #
+#  flux() doit desormais reparer ca AVANT de renvoyer le message.            #
+# --------------------------------------------------------------------------- #
+def test_lire_flux_repare_un_emoji_coupe_en_deux_par_le_streaming():
+    lignes = [
+        'data: {"choices":[{"delta":{"content":"Le site "}}]}',
+        # L'emoji U+1F30C est coupe : sa moitie haute arrive dans CETTE ligne...
+        'data: {"choices":[{"delta":{"content":"\\ud83c"}}]}',
+        # ...et sa moitie basse arrive dans la ligne SSE SUIVANTE.
+        'data: {"choices":[{"delta":{"content":"\\udf0c est pret !"}}]}',
+        "data: [DONE]",
+    ]
+    resultat = ApiClient._lire_flux(_FluxFactice(lignes), None)
+    contenu = resultat["choices"][0]["message"]["content"]
+
+    assert "\U0001F30C" in contenu   # le vrai emoji est recupere, aucune perte
+    assert contenu.encode("utf-8")  # ne doit PAS lever UnicodeEncodeError
+    assert all(not (0xD800 <= ord(c) <= 0xDFFF) for c in contenu)
+
+
+def test_lire_flux_repare_un_surrogate_orphelin_sans_planter():
+    """Si la moitie basse n'arrive jamais (flux coupe net), pas de crash."""
+    lignes = [
+        'data: {"choices":[{"delta":{"content":"Texte "}}]}',
+        'data: {"choices":[{"delta":{"content":"\\ud83c"}}]}',
+        "data: [DONE]",
+    ]
+    resultat = ApiClient._lire_flux(_FluxFactice(lignes), None)
+    contenu = resultat["choices"][0]["message"]["content"]
+
+    assert contenu.encode("utf-8")  # ne leve pas, meme sans reassemblage possible
+    assert all(not (0xD800 <= ord(c) <= 0xDFFF) for c in contenu)

@@ -24,6 +24,11 @@ import json
 import os
 import time
 
+# Reparation des surrogates isoles (emoji coupe en 2 par le streaming SSE) :
+# source unique dans api_client.py (c'est la ou le texte est produit), reprise
+# ici en filet de securite generique avant l'ecriture (voir _reparer_recursif).
+from .api_client import _reparer_texte
+
 
 DOSSIER_SESSIONS = "sessions"
 CHEMIN_LEGACY = "session_history.json"
@@ -34,6 +39,18 @@ LONGUEUR_TITRE = 48
 
 def _horodatage() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _reparer_recursif(valeur):
+    """Applique _reparer_texte() a TOUTE chaine, a n'importe quelle
+    profondeur (messages multimodaux, tool_calls, listes imbriquees...)."""
+    if isinstance(valeur, str):
+        return _reparer_texte(valeur)
+    if isinstance(valeur, list):
+        return [_reparer_recursif(v) for v in valeur]
+    if isinstance(valeur, dict):
+        return {cle: _reparer_recursif(v) for cle, v in valeur.items()}
+    return valeur
 
 
 def generer_id(dossier: str = DOSSIER_SESSIONS) -> str:
@@ -108,18 +125,26 @@ def sauver(
         except (OSError, ValueError):
             pass
 
+    # Repare les eventuels surrogates isoles (texte streame coupe en deux,
+    # voir _reparer_texte) AVANT toute autre utilisation -> le titre derive
+    # ET l'historique ecrit sont TOUS LES DEUX proteges, jamais seulement l'un.
+    historique_repare = _reparer_recursif(historique)
+
     donnees = {
         "id": id_session,
-        "titre": titre or deriver_titre(historique),
+        "titre": _reparer_texte(titre) if titre else deriver_titre(historique_repare),
         "cree": cree,
         "maj": _horodatage(),
-        "historique": historique,
+        "historique": historique_repare,
     }
     try:
         os.makedirs(dossier, exist_ok=True)
         with open(chemin, "w", encoding="utf-8") as f:
             json.dump(donnees, f, ensure_ascii=False, indent=2)
-    except OSError:
+    except (OSError, UnicodeError):
+        # Filet de securite final : meme un souci d'encodage imprevu (pas
+        # seulement disque/permissions) ne doit JAMAIS planter l'app entiere.
+        # Au pire, ce tour n'est pas sauvegarde (au lieu de perdre la session).
         pass
 
 

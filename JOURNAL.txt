@@ -1925,3 +1925,52 @@ une confirmation edit ET command (approuve direct), 'edits' -> auto-edit.
 Flux reel bout-en-bout verifie via tools._outil_write_file (fichier ecrit).
 90 -> 113 tests (dont 34 dans test_modes.py seul), TOUS OK.
 ETAT : TERMINEE ET VALIDEE.
+
+----------------------------------------------------------------
+[2026-07-06] FIX CRITIQUE - Crash total de l'app : emoji coupe en 2 par le
+             streaming SSE -> UnicodeEncodeError sur sauver() (session)
+----------------------------------------------------------------
+PROBLEME REEL (traceback fourni par l'utilisateur) : le modele a genere une
+reponse riche en emojis (🚀 📋 ✅ 🌌...). En streaming SSE, le texte arrive
+fragment par fragment ; un emoji (paire UTF-16 haute+basse) s'est retrouve
+COUPE EN DEUX entre 2 lignes SSE distinctes, chacune decodee separement par
+json.loads(). Le texte reconstitue par simple concatenation contenait alors
+un "surrogate isole" (U+D800-U+DFFF) invalide. Plus tard, sessions.sauver()
+ecrit l'historique avec json.dump(..., ensure_ascii=False) sur un fichier
+UTF-8 STRICT -> UnicodeEncodeError: 'utf-8' codec can't encode ... surrogates
+not allowed. Aggravant : le except OSError de sauver() NE capture PAS cette
+exception (UnicodeEncodeError herite de ValueError, pas OSError) -> le crash
+remontait JUSQU'A main() et fermait TOUTE l'application (traceback affiche,
+perte de la session en cours).
+
+FIX (source unique, aucune duplication) :
+  - api_client.py : _reparer_texte(texte) -> scan CARACTERE PAR CARACTERE
+    (pas de tentative globale encode/decode sur toute la chaine, qui ferait
+    echouer - et remplacer en bloc - des paires par ailleurs valides des
+    qu'UN SEUL orphelin trainait ailleurs dans le meme texte ; bug intermediaire
+    trouve et corrige AVANT ce commit via un test qui a echoue expres) :
+      * paire haute+basse ADJACENTE -> RECOMBINEE en le vrai caractere
+        (aucune perte, cas le plus courant) ;
+      * surrogate qui reste isole -> remplace par U+FFFD (mieux vaut perdre
+        1 glyphe que planter et perdre toute la conversation).
+    Applique sur 'contenu' juste avant de le renvoyer depuis _lire_flux().
+  - sessions.py : importe _reparer_texte depuis api_client.py (source unique,
+    pas de duplication) ; _reparer_recursif() l'applique a TOUTE chaine, a
+    n'importe quelle profondeur (messages multimodaux, tool_calls...) AVANT
+    de construire 'donnees' dans sauver() (protege aussi le TITRE derive,
+    calcule sur l'historique DEJA repare). except elargi a (OSError,
+    UnicodeError) : filet de securite final, un souci d'encodage imprevu ne
+    doit JAMAIS planter l'app entiere (au pire, ce tour n'est pas sauvegarde).
+
+TESTS (+8, 113 -> 121) :
+  - test_api_client.py : emoji coupe en 2 lignes SSE -> recupere intact ;
+    orphelin seul (jamais reassemble) -> ne plante pas.
+  - test_sessions.py : recombinaison sans perte, neutralisation d'un
+    orphelin, texte propre inchange (idempotent), reparation recursive
+    (dict/liste imbriques), sauver() sur le crash REPRODUIT EXACTEMENT ne
+    leve JAMAIS, titre derive lui aussi repare.
+
+VERIF : reproduit le crash exact avant fix (UnicodeEncodeError confirme) ;
+apres fix, plus aucun crash, emoji legitime recupere, orphelin neutralise ;
+121 tests OK.
+ETAT : TERMINEE ET VALIDEE.

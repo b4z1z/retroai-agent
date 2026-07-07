@@ -3,7 +3,16 @@
 import json
 import os
 
+import pytest
+
 from retroai_agent import sessions
+
+# Deux moitiees de paire UTF-16 d'un emoji (U+1F30C), telles que produites par
+# json.loads() sur 2 lignes SSE separees quand le streaming coupe le
+# caractere en deux (voir CRASH REEL rencontre : UnicodeEncodeError lors de
+# sessions.sauver() -> "surrogates not allowed").
+_SURROGATE_HAUT = json.loads('"\\ud83c"')
+_SURROGATE_BAS = json.loads('"\\udf0c"')
 
 
 def test_generer_id_unique_sur_collision(tmp_path, monkeypatch):
@@ -151,3 +160,77 @@ def test_migration_fichier_vide_ou_invalide_ignoree(tmp_path):
         json.dump([], f)  # liste vide -> rien de reel a migrer
     assert sessions.migrer_ancienne_session(chemin_legacy, dossier_sessions) is None
     assert os.path.exists(chemin_legacy)  # pas renomme, rien fait
+
+
+# --------------------------------------------------------------------------- #
+#  REGRESSION - crash reel : emoji coupe en 2 par le streaming SSE ->         #
+#  surrogate isole -> UnicodeEncodeError sur sauver() -> plantage TOTAL de    #
+#  l'app (traceback + fermeture). Doit desormais etre repare silencieusement. #
+# --------------------------------------------------------------------------- #
+def test_reparer_texte_recombine_une_paire_adjacente_sans_perte():
+    casse = "AVANT" + _SURROGATE_HAUT + _SURROGATE_BAS + "APRES"
+    repare = sessions._reparer_texte(casse)
+    assert "\U0001F30C" in repare              # le VRAI emoji est recupere
+    assert repare.encode("utf-8")              # ne leve pas
+
+
+def test_reparer_texte_neutralise_un_orphelin_sans_planter():
+    casse = "AVANT" + _SURROGATE_HAUT + "APRES"  # jamais reassemble
+    repare = sessions._reparer_texte(casse)
+    assert all(not (0xD800 <= ord(c) <= 0xDFFF) for c in repare)  # plus de surrogate
+    assert repare.encode("utf-8")              # ne leve pas
+
+
+def test_reparer_texte_ne_touche_pas_un_texte_propre():
+    propre = "Bonjour, ça marche très bien ! 🚀"
+    assert sessions._reparer_texte(propre) == propre
+
+
+def test_reparer_recursif_traite_les_structures_imbriquees():
+    casse = _SURROGATE_HAUT + _SURROGATE_BAS
+    structure = {
+        "a": casse,
+        "b": [casse, {"c": casse}],
+        "d": 42,
+        "e": None,
+    }
+    repare = sessions._reparer_recursif(structure)
+    assert "\U0001F30C" in repare["a"]
+    assert "\U0001F30C" in repare["b"][0]
+    assert "\U0001F30C" in repare["b"][1]["c"]
+    assert repare["d"] == 42 and repare["e"] is None  # types non-str intacts
+
+
+def test_sauver_avec_emoji_casse_ne_plante_jamais(tmp_path):
+    """LE crash reel reproduit : sauver() sur un historique contenant un
+    surrogate isole ne doit JAMAIS lever d'exception (avant le fix, ceci
+    faisait planter TOUTE l'application avec un traceback non rattrape)."""
+    dossier = str(tmp_path)
+    contenu_casse = (
+        "Voici le site " + _SURROGATE_HAUT + _SURROGATE_BAS + " fini, "
+        + "et un orphelin ici -> " + _SURROGATE_HAUT
+    )
+    historique = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "cree le site"},
+        {"role": "assistant", "content": contenu_casse},
+    ]
+    sessions.sauver("crash-repro", historique, dossier=dossier)  # ne doit PAS lever
+
+    donnees = sessions.charger("crash-repro", dossier=dossier)
+    assert donnees is not None
+    contenu_final = donnees["historique"][2]["content"]
+    assert "\U0001F30C" in contenu_final       # l'emoji legitime est recupere
+    assert all(not (0xD800 <= ord(c) <= 0xDFFF) for c in contenu_final)  # aucun orphelin
+
+
+def test_sauver_repare_aussi_le_titre_derive(tmp_path):
+    """Le titre est derive de historique AVANT reparation dans le code naif ;
+    verifie qu'il est bien lui aussi propre (pas seulement l'historique)."""
+    dossier = str(tmp_path)
+    premier_message = "besoin d'aide " + _SURROGATE_HAUT + _SURROGATE_BAS
+    historique = [{"role": "user", "content": premier_message}]
+    sessions.sauver("titre-casse", historique, dossier=dossier)
+    donnees = sessions.charger("titre-casse", dossier=dossier)
+    assert donnees["titre"].encode("utf-8")  # ne leve pas
+    assert "\U0001F30C" in donnees["titre"]
