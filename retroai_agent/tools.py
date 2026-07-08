@@ -21,11 +21,35 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 
 from .config import Config
 from . import safety
 from . import ui
 from . import modes
+
+
+def _encodage_console() -> str:
+    """
+    Encodage reellement utilise par le shell natif pour stdout/stderr.
+
+    Sous Windows, subprocess(shell=True) invoque cmd.exe, qui ecrit dans le
+    CODEPAGE OEM DE LA CONSOLE (souvent cp850/cp437 sur une machine
+    francophone), PAS en UTF-8. subprocess.run(text=True) sans encoding
+    explicite decode pourtant en UTF-8 (encodage prefere de Python) -> tout
+    accent dans un message d'erreur devient du mojibake (ex. "chemin
+    d'accŠs" au lieu de "chemin d'accès" - verifie : 0x160 au lieu de 0xE8).
+    Recuperer le VRAI codepage OEM via l'API Windows (GetOEMCP) et decoder
+    avec corrige ca. Ailleurs (Linux/macOS), l'encodage prefere convient.
+    """
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            return f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+        except Exception:
+            return "cp850"  # repli raisonnable (le plus courant sous Windows)
+    import locale
+    return locale.getpreferredencoding(False) or "utf-8"
 
 
 # Limite de taille pour read_file (cahier des charges).
@@ -274,7 +298,8 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
             command,
             shell=True,
             capture_output=True,
-            text=True,
+            encoding=_encodage_console(),
+            errors="replace",  # ne plante jamais sur un octet imprevu
             timeout=config.shell_timeout,
         )
     except subprocess.TimeoutExpired:

@@ -1,6 +1,7 @@
 """Tests de tools.py : write_file (creation dossiers, modes d'approbation)."""
 
 import os
+import sys
 
 import pytest
 
@@ -89,3 +90,23 @@ def test_write_file_mode_plan_bloque_sans_toucher_au_disque(tmp_path, config):
     resultat = tools._outil_write_file({"path": str(chemin), "content": "x"}, config)
     assert "Blocked" in resultat
     assert not chemin.exists()
+
+
+# --------------------------------------------------------------------------- #
+#  REGRESSION - sortie shell accentuee illisible (mojibake) sous Windows :    #
+#  cmd.exe ecrit dans le CODEPAGE OEM de la console (souvent cp850), mais     #
+#  subprocess.run(text=True) decodait en UTF-8 -> "chemin d'accès" devenait   #
+#  "chemin d'accŠs" (0xE8 lu comme 0x160). L'agent voyait alors des messages  #
+#  d'erreur illisibles au lieu du vrai message.                              #
+# --------------------------------------------------------------------------- #
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="specifique a Windows/cmd.exe")
+def test_run_shell_command_accents_corrects_sous_windows(config):
+    modes.definir(modes.AUTO_ALL)
+    resultat = tools._outil_run_shell_command(
+        {"command": "dir /XYZ-inexistant-flag"}, config
+    )
+    # Le mot "param" (de "paramètre") doit etre suivi du VRAI "è" (U+00E8),
+    # pas d'un caractere mojibake comme "Š" (U+0160).
+    i = resultat.find("param")
+    assert i != -1, resultat
+    assert ord(resultat[i + 5]) == 0xE8

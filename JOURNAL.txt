@@ -1974,3 +1974,53 @@ VERIF : reproduit le crash exact avant fix (UnicodeEncodeError confirme) ;
 apres fix, plus aucun crash, emoji legitime recupere, orphelin neutralise ;
 121 tests OK.
 ETAT : TERMINEE ET VALIDEE.
+
+----------------------------------------------------------------
+[2026-07-08] FIX CRITIQUE - Agent perdu sous Windows : prompt "Linux terminal"
+             en dur + sortie shell accentuee illisible (mojibake)
+----------------------------------------------------------------
+CONTEXTE : en usage reel, demande a BAZIZ.IA de corriger des bugs dans un
+projet genere (aether-observatory/app.js). L'agent a tente "find -name"
+(syntaxe Unix) plusieurs fois, echouant sous cmd.exe avec des messages
+d'erreur totalement illisibles ("Le chemin d'accŠs sp‚cifi‚ est introuvable"
+au lieu de "Le chemin d'accès spécifié..."), a fini par trouver le bon
+chemin via "dir /s /b", puis a repondu par une reponse VIDE au lieu de
+continuer la tache (abandon apres plusieurs tours perdus/confus).
+
+CAUSE #1 (racine) : SYSTEME disait litteralement "from a Linux terminal" EN
+DUR, meme sur une machine Windows -> l'agent suivait cette instruction
+FAUSSE et essayait des commandes Unix qui n'existent pas sous cmd.exe.
+FIX #1 : agent_loop._description_plateforme() detecte la VRAIE plateforme
+via sys.platform et decrit les commandes NATIVES a utiliser (dir, dir /s /b,
+findstr, del/copy/move, type sous Windows ; commandes Unix normales sur
+Linux/macOS). SYSTEME construit dynamiquement avec cette description.
+
+CAUSE #2 (aggravante) : tools._outil_run_shell_command utilisait
+subprocess.run(text=True) SANS encoding explicite. Sous Windows, cmd.exe
+ecrit dans le CODEPAGE OEM DE LA CONSOLE (cp850 ici), pas en UTF-8 ->
+"è" (0xE8) mal decode devenait "Š" (0x160) -> messages d'erreur mojibake
+qui ont probablement contribue a la confusion de l'agent (erreurs deja
+illisibles, en plus d'une syntaxe deja fausse).
+FIX #2 : tools._encodage_console() recupere le VRAI codepage OEM via l'API
+Windows (GetOEMCP), utilise comme encoding= explicite (+errors="replace"
+pour ne jamais planter sur un octet imprevu). Verifie par reproduction
+exacte du bug (codepoint 0x160 avant, 0xE8 apres = "è" correct).
+
+TESTS (+5, 121 -> 126) :
+  - test_tools.py : sortie shell accentuee correcte sous Windows (skip sur
+    autres OS), verifiee via message d'erreur reel genere par cmd.exe.
+  - test_agent_loop_prompt.py (NOUVEAU) : plateforme Windows/macOS/Linux
+    correctement decrite (cmd.exe+dir /s /b sous Windows, find -name
+    explicitement signalee comme invalide) ; SYSTEME inclut bien la
+    description dynamique (pas de "Linux terminal" fige).
+
+DIAGNOSTIC AETHER-OBSERVATORY (projet de test genere, PAS commis dans ce
+repo) : 3 bugs identifies et confirmes en direct (preview_eval, bissection
+du script pour isoler les erreurs de syntaxe) - identifiant invalide
+"star-studded" (tiret), argument itemSize manquant sur BufferAttribute,
+saut de ligne casse (litteral "n" au lieu de "\n") avant "const closeBtn".
+L'utilisateur a demande a BAZIZ.IA lui-meme de corriger (pas Claude Code) ;
+c'est LA que le bug plateforme/encodage ci-dessus a ete decouvert.
+
+VERIF : 126 tests OK. Aucun caractere corrompu introduit (verifie explicitement).
+ETAT : TERMINEE ET VALIDEE.

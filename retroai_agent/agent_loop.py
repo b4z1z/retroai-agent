@@ -22,6 +22,7 @@ PIEGE des arguments :
 from __future__ import annotations
 
 import json
+import sys
 import threading
 
 from .api_client import ApiClient, ApiError, TimeoutApiError
@@ -34,14 +35,42 @@ from . import thinking
 from . import sessions
 
 
+def _description_plateforme() -> str:
+    """
+    Decrit la VRAIE plateforme/shell d'execution (detectee via sys.platform),
+    avec des exemples de commandes NATIVES a utiliser.
+
+    BUG REEL CORRIGE : le prompt disait auparavant "Linux terminal" en dur,
+    meme sur une machine Windows. L'agent tentait alors des commandes Unix
+    (ex. "find -name") qui echouent sous cmd.exe, produisant des messages
+    d'erreur confus (aggrave par un bug d'encodage separe, deja corrige dans
+    tools.py) -> plusieurs tours perdus, et l'agent a fini par abandonner
+    avec une reponse vide au lieu de continuer la tache.
+    """
+    if sys.platform.startswith("win"):
+        return (
+            "a Windows machine. Shell commands run through cmd.exe (native "
+            "Windows console), NOT bash/Unix — Unix commands/flags (find -name, "
+            "grep, ls -la...) do NOT work here. Use Windows-native commands "
+            "instead: 'dir' (not 'ls'), 'dir /s /b <name>' to find a file by "
+            "name anywhere below the current folder (not 'find -name'), "
+            "'findstr' (not 'grep'), 'del'/'copy'/'move' (not 'rm'/'cp'/'mv'), "
+            "'type' (not 'cat'). Paths use backslashes."
+        )
+    if sys.platform == "darwin":
+        return "a macOS machine. Shell commands run through a Unix shell (bash/zsh)."
+    return "a Linux machine. Shell commands run through a Unix shell (bash)."
+
+
 # Message systeme : definit le role et le comportement de l'agent.
 SYSTEME = (
     "You are BAZIZ.IA, an autonomous agent that helps the user from a "
-    "Linux terminal. You have tools to read/write files, list directories "
-    "and run shell commands. Use them when useful. Reply concisely, in the "
-    "same language as the user. If the user references an image file, that "
-    "image is ALREADY attached to the message: look at it directly, do not "
-    "try to open or inspect it with shell tools.\n"
+    f"terminal on {_description_plateforme()} You have tools to read/write "
+    "files, list directories and run shell commands. Use them when useful. "
+    "Reply concisely, in the same language as the user. If the user "
+    "references an image file, that image is ALREADY attached to the "
+    "message: look at it directly, do not try to open or inspect it with "
+    "shell tools.\n"
     "FILES - when asked to CREATE, MODIFY, IMPROVE, FIX or REFACTOR code: do "
     "NOT just print the whole new code in the chat. ACTUALLY save it with the "
     "write_file tool, to the file's exact path when it is known (overwrite "
