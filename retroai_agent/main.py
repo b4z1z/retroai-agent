@@ -118,6 +118,9 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/restart":
             _redemarrer()  # ne revient jamais (quitte apres la relance)
+        if saisie == "/btw":
+            ui.afficher_jetons(agent.jetons_tour, agent.jetons_session)
+            continue
         if saisie == "/add-image":
             _envoyer_avec_image(agent, images.choisir_image_dialogue(),
                                 source="file dialog")

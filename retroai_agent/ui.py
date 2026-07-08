@@ -304,10 +304,13 @@ class _Attente:
 
     FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
-    def __init__(self, message: str = "Thinking") -> None:
+    def __init__(self, message: str = "Thinking", extra=None) -> None:
         self._stop = threading.Event()
         self._th: threading.Thread | None = None
         self.message = message
+        # Callable optionnel -> texte ajoute en direct dans la ligne du
+        # spinner (ex. compteur de tokens de raisonnement consommes).
+        self._extra = extra
 
     def demarrer(self) -> None:
         def run() -> None:
@@ -315,14 +318,20 @@ class _Attente:
             i = 0
             while not self._stop.is_set():
                 secondes = int(time.monotonic() - debut)
+                extra = ""
+                if self._extra is not None:
+                    try:
+                        extra = self._extra() or ""
+                    except Exception:
+                        extra = ""
                 sys.stdout.write(
                     f"\r  {self.FRAMES[i % len(self.FRAMES)]} {self.message}… "
-                    f"{secondes}s (Ctrl+C to stop)  "
+                    f"{secondes}s{extra} (Ctrl+C to stop)  "
                 )
                 sys.stdout.flush()
                 i += 1
                 self._stop.wait(0.1)
-            sys.stdout.write("\r" + " " * 56 + "\r")  # efface la ligne
+            sys.stdout.write("\r" + " " * 76 + "\r")  # efface la ligne
             sys.stdout.flush()
 
         self._th = threading.Thread(target=run, daemon=True)
@@ -335,25 +344,42 @@ class _Attente:
             self._th = None
 
 
+# Estimation grossiere : ~4 caracteres par token (suffisant pour un compteur
+# "fun" affiche en direct ; les vrais comptes viennent de l'API quand dispo).
+CHARS_PAR_TOKEN = 4
+
+
 def creer_stream_printer():
     """
-    Cree (printer, cloturer) pour afficher une reponse EN DIRECT (streaming).
+    Cree (printer, cloturer, stats) pour afficher une reponse EN DIRECT.
 
     Le RAISONNEMENT (mode thinking) n'est PAS affiche : pendant que le modele
-    reflechit, seul le spinner "Thinking… Ns" tourne (les fragments de
-    raisonnement recus servent uniquement de signe de vie). La REPONSE, elle,
-    s'affiche au fil de l'eau sous l'en-tete "⏺ BAZIZ.IA".
+    reflechit, le spinner "Thinking… Ns · ~T tok" tourne, avec un COMPTEUR DE
+    TOKENS estime en direct (caracteres de raisonnement recus / 4). La
+    REPONSE, elle, s'affiche au fil de l'eau sous l'en-tete "⏺ BAZIZ.IA".
 
     printer(fragment, reflexion=False) ; cloturer() -> True si une REPONSE a
-    ete affichee (l'appelant ne doit alors pas la reafficher).
+    ete affichee ; stats() -> {"pense_chars": N, "reponse_chars": M} (sert au
+    compteur de tokens de /btw quand l'API ne renvoie pas de champ usage).
     """
-    attente = _Attente()
+    compteur = {"pense_chars": 0, "reponse_chars": 0}
+
+    def _suffixe_tokens() -> str:
+        if compteur["pense_chars"] == 0:
+            return ""
+        return f" · ~{compteur['pense_chars'] // CHARS_PAR_TOKEN} tok"
+
+    attente = _Attente(extra=_suffixe_tokens)
     attente.demarrer()
     etat = {"ouvert": False}
 
     def printer(fragment: str, reflexion: bool = False) -> None:
         if reflexion:
-            return  # raisonnement masque : le spinner suffit
+            # Raisonnement masque : on le COMPTE (compteur live du spinner
+            # + stats pour /btw), sans l'afficher.
+            compteur["pense_chars"] += len(fragment)
+            return
+        compteur["reponse_chars"] += len(fragment)
         if not etat["ouvert"]:
             attente.arreter()
             _stream_entete()
@@ -368,7 +394,10 @@ def creer_stream_printer():
             sys.stdout.flush()
         return etat["ouvert"]
 
-    return printer, cloturer
+    def stats() -> dict:
+        return dict(compteur)
+
+    return printer, cloturer, stats
 
 
 def reponse_agent(texte: str) -> None:
@@ -652,6 +681,46 @@ def astuce_modes(categorie: str = "") -> None:
         print(f"  {texte}")
 
 
+def _ligne_jetons(compteurs: dict) -> str:
+    """Formate une ligne de compteur de tokens ('?' si l'API n'a rien donne)."""
+    entree = f"{compteurs['entree']:,}".replace(",", " ") if compteurs["entree"] else "?"
+    if compteurs["sortie"]:
+        sortie = f"{compteurs['sortie']:,}".replace(",", " ")
+    elif compteurs["sortie_est"]:
+        sortie = f"~{compteurs['sortie_est']:,}".replace(",", " ")
+    else:
+        sortie = "?"
+    pense = compteurs["raisonnement_est"]
+    detail_pense = f"  ·  thinking ~{pense:,}".replace(",", " ") if pense else ""
+    return f"in {entree}  ·  out {sortie}{detail_pense}"
+
+
+def afficher_jetons(tour: dict, session: dict) -> None:
+    """
+    Commande /btw : petit compteur de tokens "pour le fun".
+    'in/out' = comptes reels renvoyes par l'API (usage) quand disponibles ;
+    'thinking ~N' et les valeurs prefixees de ~ sont des ESTIMATIONS cote
+    client (~4 caracteres/token) depuis le texte streame.
+    """
+    if RICH_DISPO:
+        t = Text()
+        t.append("🤔 btw — token meter\n\n", style=f"bold {ACCENT}")
+        t.append("Last turn : ", style=DIM)
+        t.append(_ligne_jetons(tour) + "\n", style="default")
+        t.append("Session   : ", style=DIM)
+        t.append(_ligne_jetons(session), style="default")
+        t.append(f"   ({session['appels']} API calls)\n\n", style=DIM)
+        t.append("~ values are client-side estimates (≈4 chars/token); "
+                 "'?' = the API did not report usage.", style=DIM)
+        _console.print()
+        _console.print(Panel(t, border_style=DIM, padding=(1, 4), expand=True))
+    else:
+        print("\n[btw - token meter]")
+        print(f"  Last turn : {_ligne_jetons(tour)}")
+        print(f"  Session   : {_ligne_jetons(session)}  ({session['appels']} API calls)")
+        print("  (~ = estimate, ? = usage not reported by the API)")
+
+
 def niveau_thinking(niveau: str) -> None:
     """Affiche le niveau de reflexion courant (apres un changement)."""
     if RICH_DISPO:
@@ -764,6 +833,7 @@ COMMANDES = [
     ("/sessions", "List saved conversations and switch between them"),
     ("/new", "Start a brand-new session (previous one stays saved)"),
     ("/reset", "Clear the conversation (same as /new)"),
+    ("/btw", "Fun token meter — tokens used by the last turn and the session"),
     ("/restart", "Restart the app (reloads code & .env; conversation stays saved)"),
     ("/exit, /quit", "Quit the program"),
 ]

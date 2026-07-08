@@ -328,6 +328,7 @@ class ApiClient:
         contenu = ""
         outils: dict = {}
         finish = None
+        usage = None
         try:
             for ligne in reponse.iter_lines(decode_unicode=True):
                 if not ligne:
@@ -340,6 +341,11 @@ class ApiClient:
                     obj = json.loads(ligne)
                 except ValueError:
                     continue  # ligne non-JSON (keep-alive...) -> on ignore
+                # Comptes de tokens : certains serveurs les envoient dans le
+                # dernier morceau du flux -> on les capture s'ils passent
+                # (sert au compteur /btw ; sinon estimation cote client).
+                if obj.get("usage"):
+                    usage = obj["usage"]
                 choix = (obj.get("choices") or [{}])[0]
                 delta = choix.get("delta") or {}
                 # Raisonnement (thinking) streame par NIM : montre en direct
@@ -374,7 +380,10 @@ class ApiClient:
         message = {"role": "assistant", "content": _reparer_texte(contenu)}
         if outils:
             message["tool_calls"] = [outils[i] for i in sorted(outils)]
-        return {"choices": [{"message": message, "finish_reason": finish}]}
+        resultat = {"choices": [{"message": message, "finish_reason": finish}]}
+        if usage:
+            resultat["usage"] = usage
+        return resultat
 
     # ------------------------------------------------------------------ #
     #  Generation d'image (text-to-image) - endpoint genai (FLUX)        #

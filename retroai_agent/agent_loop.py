@@ -170,6 +170,11 @@ AIDE_LOGICIEL = (
     "code and the .env configuration (useful right after the software was "
     "updated). The conversation is saved automatically; after restarting, "
     "/continue picks it up again.\n"
+    "- /btw : a fun token meter — shows how many tokens the LAST turn and "
+    "the whole session used (input/output, plus an estimated count for the "
+    "hidden reasoning). Values marked ~ are client-side estimates. The live "
+    "'Thinking…' spinner also shows an estimated reasoning-token counter "
+    "while the model thinks.\n"
     "- /exit or /quit : quit the program.\n"
     "To send an image FOR YOU TO ANALYZE: use /add-image, or /paste, or simply "
     "mention an existing image file path (or an http(s) image URL) inside your "
@@ -210,7 +215,18 @@ class AgentLoop:
         # message utilisateur pour rester stable au fil des sauvegardes.
         self.session_id: str | None = None
         self.session_titre: str | None = None
+        # Compteurs de tokens (commande /btw + spinner). Runtime uniquement
+        # (pas persistes). "entree"/"sortie" viennent du champ usage de l'API
+        # quand il est present ; "raisonnement_est"/"sortie_est" sont des
+        # ESTIMATIONS cote client (~4 chars/token) depuis le texte streame.
+        self.jetons_session = self._jetons_zero()
+        self.jetons_tour = self._jetons_zero()
         self.reset()
+
+    @staticmethod
+    def _jetons_zero() -> dict:
+        return {"appels": 0, "entree": 0, "sortie": 0,
+                "raisonnement_est": 0, "sortie_est": 0}
 
     def reset(self) -> None:
         """
@@ -227,6 +243,8 @@ class AgentLoop:
         self.tour_incomplet = False
         self.session_id = None
         self.session_titre = None
+        self.jetons_session = self._jetons_zero()
+        self.jetons_tour = self._jetons_zero()
 
     # ------------------------------------------------------------------ #
     #  Parsing robuste des arguments d'un tool call                      #
@@ -323,7 +341,7 @@ class AgentLoop:
         + appel interruptible + 1 reessai sur erreur reseau.
         """
         if self.config.stream:
-            printer, cloturer = ui.creer_stream_printer()
+            printer, cloturer, stats = ui.creer_stream_printer()
             self._stream_affiche = False
             try:
                 reponse = self.client.chat(
@@ -332,6 +350,7 @@ class AgentLoop:
             finally:
                 # Vrai si du texte a ete affiche en direct (-> ne pas reafficher).
                 self._stream_affiche = cloturer()
+            self._comptabiliser(reponse, stats())
             return reponse
 
         # --- Mode non-streaming (reponse complete d'un coup) -------------
@@ -339,11 +358,13 @@ class AgentLoop:
         for tentative in range(2):  # 1 essai + 1 reessai
             try:
                 with ui.reflexion():
-                    return self._executer_interruptible(
+                    reponse = self._executer_interruptible(
                         lambda: self.client.chat(
                             self.historique, tools=tools.TOOLS_SCHEMA
                         )
                     )
+                self._comptabiliser(reponse, None)
+                return reponse
             except TimeoutApiError:
                 # Un timeout sur une generation deja longue : inutile de
                 # reessayer (on re-attendrait aussi longtemps). On remonte direct.
@@ -354,6 +375,35 @@ class AgentLoop:
                     ui.info("Network issue — retrying automatically…")
         # Les deux tentatives ont echoue.
         raise derniere_erreur  # type: ignore[misc]
+
+    def _comptabiliser(self, reponse: dict, flux: dict | None) -> None:
+        """
+        Met a jour les compteurs de tokens (tour + session) apres un appel.
+
+        - reponse["usage"] : comptes REELS (prompt_tokens/completion_tokens)
+          si le serveur les fournit ;
+        - flux : compteurs de caracteres streames (pense_chars/reponse_chars),
+          convertis en tokens ESTIMES (~4 chars/token) — seule source pour le
+          raisonnement, et repli pour la sortie si usage est absent.
+        Ne doit JAMAIS faire echouer un tour -> tolerant a tout format.
+        """
+        try:
+            usage = reponse.get("usage") or {}
+            entree = int(usage.get("prompt_tokens") or 0)
+            sortie = int(usage.get("completion_tokens") or 0)
+            pense_est = 0
+            sortie_est = 0
+            if flux:
+                pense_est = flux.get("pense_chars", 0) // ui.CHARS_PAR_TOKEN
+                sortie_est = flux.get("reponse_chars", 0) // ui.CHARS_PAR_TOKEN
+            for compteurs in (self.jetons_tour, self.jetons_session):
+                compteurs["appels"] += 1
+                compteurs["entree"] += entree
+                compteurs["sortie"] += sortie
+                compteurs["raisonnement_est"] += pense_est
+                compteurs["sortie_est"] += sortie_est
+        except Exception:
+            pass  # compteur "fun" : jamais au prix d'un tour casse
 
     # ------------------------------------------------------------------ #
     #  Traitement d'un tour de parole utilisateur                        #
@@ -407,6 +457,8 @@ class AgentLoop:
         sauvegardee, pour pouvoir reprendre plus tard avec /continue sans
         repartir de zero.
         """
+        # Nouveau tour -> remet a zero le compteur de tokens DU TOUR (/btw).
+        self.jetons_tour = self._jetons_zero()
         try:
             reponse_finale = self._dialoguer()
         except (ApiError, KeyboardInterrupt):
