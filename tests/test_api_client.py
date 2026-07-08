@@ -66,6 +66,25 @@ def test_lire_flux_sans_callback():
     assert res["choices"][0]["message"]["content"] == "ok"
 
 
+def test_est_modele_introuvable():
+    """Reproduit le 404 reel : deploiement kimi casse cote NVIDIA alors que
+    le modele etait encore liste au catalogue."""
+    from retroai_agent.api_client import (
+        _est_modele_introuvable, _message_modele_introuvable,
+    )
+    reel = ('{"status":404,"title":"Not Found","detail":"Function '
+            "'23d4f03a-b8a6-4adb-a183-7daa083a09cc': Not found for account "
+            "'UNswZ6yevGCkOJl2zmoIsoLrM2dEhf1NzxNsYQoZGuc'\"}")
+    assert _est_modele_introuvable(reel)
+    assert not _est_modele_introuvable('{"detail":"route not found"}')  # pas une function
+    assert not _est_modele_introuvable("")
+
+    message = _message_modele_introuvable("moonshotai/kimi-k2.6")
+    assert "moonshotai/kimi-k2.6" in message
+    assert "NVIDIA_MODEL" in message          # dit QUOI faire
+    assert "not a bug" in message             # rassure : pas un bug de l'app
+
+
 def test_est_saturation():
     vrai = (
         '{"message":"ResourceExhausted: Worker local total request limit '

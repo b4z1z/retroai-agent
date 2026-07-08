@@ -104,6 +104,28 @@ def _reparer_texte(texte: str) -> str:
     return "".join(resultat)
 
 
+def _est_modele_introuvable(texte: str) -> bool:
+    """
+    Vrai si une reponse 404 signifie "le MODELE configure n'est pas/plus
+    disponible" (vecu en reel : kimi-k2.6 encore liste au catalogue, mais son
+    deploiement NVIDIA cassé -> {"status":404,...,"detail":"Function '...':
+    Not found for account '...'"}). Sans ce mapping, l'utilisateur recoit un
+    dump JSON cryptique qui ressemble a un bug de l'app alors que c'est une
+    indisponibilite cote NVIDIA.
+    """
+    t = (texte or "").lower()
+    return "function" in t and "not found" in t
+
+
+def _message_modele_introuvable(modele: str) -> str:
+    return (
+        f"The configured model ({modele}) is currently NOT available on "
+        "NVIDIA's side (404 Function not found) - this is not a bug in "
+        "BAZIZ.IA and usually temporary. Options: try again later, or switch "
+        "model: edit NVIDIA_MODEL in .env then /restart. Your API key is fine."
+    )
+
+
 def _est_saturation(texte: str) -> bool:
     """
     Vrai si une reponse 5xx traduit une SATURATION TRANSITOIRE du worker NIM
@@ -252,6 +274,10 @@ class ApiClient:
             if reponse.status_code >= 500 and _est_saturation(reponse.text):
                 raise ApiError(MSG_SATURATION)
 
+            # --- Modele indisponible cote NVIDIA (404 Function not found) -
+            if reponse.status_code == 404 and _est_modele_introuvable(reponse.text):
+                raise ApiError(_message_modele_introuvable(self.config.model))
+
             # --- Autres erreurs HTTP : pas recuperables ------------------
             if reponse.status_code != 200:
                 extrait = reponse.text[:500]
@@ -305,6 +331,8 @@ class ApiClient:
                 raise ApiError("Rate limit (429) still active. Giving up.")
             if reponse.status_code >= 500 and _est_saturation(reponse.text):
                 raise ApiError(MSG_SATURATION)
+            if reponse.status_code == 404 and _est_modele_introuvable(reponse.text):
+                raise ApiError(_message_modele_introuvable(self.config.model))
             if reponse.status_code != 200:
                 raise ApiError(
                     f"HTTP error {reponse.status_code} from the NVIDIA API:\n"

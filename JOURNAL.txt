@@ -2103,3 +2103,38 @@ retroai_agent.main" et transmet le code de sortie (subprocess mocke, aucun
 vrai processus) ; le dispatch /restart appelle le handler ; la commande est
 documentee dans le menu et l'aide IA. 131 -> 134 tests, tous OK.
 ETAT : TERMINEE ET VALIDEE (a essayer en reel : /restart dans baziz.ia).
+
+----------------------------------------------------------------
+[2026-07-09] FEATURES /btw + /restart + tokens live, et PANNE NVIDIA kimi
+----------------------------------------------------------------
+1) /restart : relance BAZIZ.IA dans un processus Python NEUF (recharge code
+   + .env). Pas d'os.exec* (sous Windows le shell parent reprend la console
+   en parallele) -> subprocess.call bloquant puis SystemExit(code). SIGINT
+   ignore par le parent pendant l'attente. Conversation deja autosauvee ->
+   /continue dans la nouvelle instance.
+2) /btw : compteur de tokens "fun". agent_loop.jetons_tour/jetons_session
+   (appels, entree/sortie reels via usage API, raisonnement_est/sortie_est
+   estimes ~4 chars/token depuis le flux). _comptabiliser() apres chaque
+   appel (stream: stats du printer ; non-stream: usage seul). Remise a zero
+   du tour a chaque _executer_tour, du tout a chaque reset(). ui.afficher_
+   jetons() (panneau "btw - token meter", ~ = estime, ? = usage non fourni).
+   api_client._lire_flux capture obj["usage"] si le serveur l'envoie (NIM ne
+   l'envoie PAS en streaming pour l'instant -> estimations, verifie en reel).
+3) SPINNER LIVE : "Thinking… 12s · ~340 tok" — _Attente(extra=callable), le
+   printer compte les chars de raisonnement en direct (CHARS_PAR_TOKEN=4).
+4) PANNE REELLE DIAGNOSTIQUEE : 404 "Function '23d4...': Not found for
+   account" sur TOUTE requete kimi-k2.6, meme minimale, alors que /v1/models
+   liste encore le modele et que llama repond 200 (cle OK). => deploiement
+   kimi CASSE COTE NVIDIA, rien a voir avec l'app. Candidats testes en reel
+   (tools + reasoning OK) : deepseek-ai/deepseek-v4-flash et z-ai/glm-5.2
+   (qwen3.5-122b : timeout). .env local bascule sur deepseek-v4-flash pour
+   debloquer (REVERSIBLE : remettre NVIDIA_MODEL=moonshotai/kimi-k2.6 puis
+   /restart quand NVIDIA aura repare). Verifie de bout en bout via ApiClient
+   streaming (reponse OK, raisonnement streame).
+5) MAPPING D'ERREUR : api_client._est_modele_introuvable + _message_modele_
+   introuvable -> le 404 cryptique devient un message clair ("modele
+   indisponible cote NVIDIA, pas un bug, editez NVIDIA_MODEL puis /restart"),
+   branche dans _chat_simple ET _chat_stream.
+TESTS : test_jetons.py (8 : printer/formats/usage SSE/accumulation tour vs
+session/reset/menu) + test 404 mapping. 131 -> 143, tous OK.
+ETAT : TERMINE ET VALIDE (y compris en reel contre l'API).
