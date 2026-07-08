@@ -1,8 +1,9 @@
 # RetroAI Agent
 
-Client CLI **léger** transformant un vieux PC (cible : Core 2 Duo, 4 Go RAM,
-Linux Mint XFCE) en terminal pour un **agent autonome** propulsé par l'API
-**NVIDIA NIM** (modèle `moonshotai/kimi-k2.6`).
+Client CLI **léger** transformant un terminal (Windows, Linux ou macOS) en
+**agent autonome** propulsé par l'API **NVIDIA NIM** (modèle
+`moonshotai/kimi-k2.6`). Pensé pour rester léger et tourner même sur une
+machine modeste.
 
 100 % ligne de commande, sans framework lourd. Dépendance principale :
 `requests`. L'agent peut lire/écrire des fichiers, lister des répertoires et

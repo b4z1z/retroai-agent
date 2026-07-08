@@ -2024,3 +2024,16 @@ c'est LA que le bug plateforme/encodage ci-dessus a ete decouvert.
 
 VERIF : 126 tests OK. Aucun caractere corrompu introduit (verifie explicitement).
 ETAT : TERMINEE ET VALIDEE.
+
+----------------------------------------------------------------
+[2026-07-08] DOC - README : positionnement generique (plus "Linux Mint" only)
+----------------------------------------------------------------
+  Le projet ciblait a l'origine exclusivement Linux (Linux Mint XFCE, vieux
+  PC). Suite au fix "plateforme detectee dynamiquement" (commit 920a481),
+  BAZIZ.IA est desormais utilise ET teste activement sous Windows aussi.
+  Intro README.md mise a jour : "un vieux PC (Linux Mint XFCE)" -> "un
+  terminal (Windows, Linux ou macOS)", en gardant l'esprit "leger, tourne
+  sur une machine modeste". Les sections d'installation OS-specifiques
+  (### Linux / macOS, ### Windows) restaient deja correctement separees,
+  inchangees.
+  VERIF : 126 tests toujours OK (changement doc uniquement).
