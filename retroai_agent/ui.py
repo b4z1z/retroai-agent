@@ -764,6 +764,7 @@ COMMANDES = [
     ("/sessions", "List saved conversations and switch between them"),
     ("/new", "Start a brand-new session (previous one stays saved)"),
     ("/reset", "Clear the conversation (same as /new)"),
+    ("/restart", "Restart the app (reloads code & .env; conversation stays saved)"),
     ("/exit, /quit", "Quit the program"),
 ]
 

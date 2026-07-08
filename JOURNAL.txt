@@ -2073,3 +2073,33 @@ tout l'historique reste serialisable ET rechargeable pour les tours
 suivants (simule ce que json.dumps+re-envoi a l'API ferait) ; sauver_session
 ne replante plus. 126 -> 131 tests, tous OK.
 ETAT : TERMINEE ET VALIDEE.
+
+----------------------------------------------------------------
+[2026-07-08] ETAPE - Commande /restart (relance dans un processus neuf)
+----------------------------------------------------------------
+BESOIN : apres chaque mise a jour du code de BAZIZ.IA, l'utilisateur devait
+fermer puis relancer l'app a la main (une app deja ouverte garde l'ancien
+code en memoire). /restart le fait en une commande.
+
+IMPLEMENTATION (main.py :: _redemarrer) :
+  - Lance "<python> -m retroai_agent.main" en PROCESSUS FILS, l'ATTEND
+    (subprocess.call), puis quitte en transmettant son code de sortie.
+  - PAS os.exec* : sous Windows il ne remplace pas vraiment le processus ->
+    le shell parent croit la commande finie et affiche son invite pendant
+    que la nouvelle instance tourne (les deux se battent pour la console).
+  - Le parent ignore SIGINT pendant l'attente -> Ctrl+C (bouton stop) reste
+    gere par la nouvelle instance seule.
+  - Nouveau processus = code source ET .env recharges. Conversation deja
+    autosauvegardee -> /continue dans la nouvelle instance la reprend.
+  - Nuance documentee : les variables d'env HERITEES du parent gardent la
+    priorite sur un .env edite a la main pendant que l'app tournait (cas
+    limite ; set_env_value ecrit de toute facon les deux).
+
+DOCS : /restart ajoute a ui.COMMANDES (menu + COMMANDES.txt + autocompletion),
+AIDE_LOGICIEL (l'IA sait l'expliquer), tableau des commandes du README.
+
+TESTS (tests/test_restart.py, NOUVEAU, 3) : relance bien "<python> -m
+retroai_agent.main" et transmet le code de sortie (subprocess mocke, aucun
+vrai processus) ; le dispatch /restart appelle le handler ; la commande est
+documentee dans le menu et l'aide IA. 131 -> 134 tests, tous OK.
+ETAT : TERMINEE ET VALIDEE (a essayer en reel : /restart dans baziz.ia).

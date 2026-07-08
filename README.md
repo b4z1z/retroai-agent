@@ -212,6 +212,7 @@ Commandes de l'interface :
 | `/sessions`      | Liste les conversations sauvegardées et permet d'en changer. |
 | `/new`           | Démarre une nouvelle session (l'ancienne reste sauvegardée). |
 | `/reset`         | Vide la conversation courante (équivalent à `/new`).         |
+| `/restart`       | Redémarre l'app (recharge le code et la config `.env`).      |
 | `/exit`, `/quit` | Quitte proprement.                                           |
 
 Astuces :

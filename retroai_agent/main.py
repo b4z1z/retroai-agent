@@ -14,6 +14,8 @@ Lancement :
 
 from __future__ import annotations
 
+import signal
+import subprocess
 import sys
 
 from .config import load_config, set_env_value
@@ -114,6 +116,8 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         if saisie == "/tuto":
             tuto.jouer(force=True)
             continue
+        if saisie == "/restart":
+            _redemarrer()  # ne revient jamais (quitte apres la relance)
         if saisie == "/add-image":
             _envoyer_avec_image(agent, images.choisir_image_dialogue(),
                                 source="file dialog")
@@ -161,6 +165,33 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         #    dans agent_loop). Pour un message multi-ligne, utiliser Alt+Entree
         #    (retour a la ligne) puis Entree pour envoyer, ou /write, ou /compose.
         _traiter_reponse(agent, saisie=saisie)
+
+
+def _redemarrer() -> None:
+    """
+    Commande /restart : relance BAZIZ.IA dans un interpreteur Python NEUF
+    (le code source ET le fichier .env sont donc recharges - pratique apres
+    une mise a jour du code, sans fermer/rouvrir le terminal a la main).
+
+    Implementation : on lance la nouvelle instance en PROCESSUS FILS et on
+    l'ATTEND, puis on quitte avec son code de sortie. On n'utilise PAS
+    os.exec* : sous Windows il ne remplace pas vraiment le processus (le
+    shell parent croit la commande finie et affiche son invite pendant que
+    la nouvelle instance tourne encore -> les deux se battent pour la
+    console). Le parent ignore Ctrl+C pendant l'attente pour que le "stop"
+    reste gere par la nouvelle instance seule.
+
+    La conversation courante est deja sauvegardee automatiquement apres
+    chaque tour -> /continue dans la nouvelle instance la reprend.
+    """
+    ui.info("Restarting BAZIZ.IA… (your conversation is saved — use "
+            "/continue in the new instance to pick it up)")
+    try:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    except (ValueError, OSError):
+        pass  # environnement sans gestion de signaux -> tant pis, on relance
+    code = subprocess.call([sys.executable, "-m", "retroai_agent.main"])
+    raise SystemExit(code)
 
 
 def _gerer_continue(agent: AgentLoop) -> None:
