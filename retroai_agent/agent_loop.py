@@ -473,6 +473,17 @@ class AgentLoop:
                         f"Error: invalid JSON arguments for '{nom}' "
                         f"({exc}). Received arguments: {brut}"
                     )
+                    # IMPORTANT : le modele peut generer des arguments JSON mal
+                    # echappes sur du gros contenu (ex. un enorme fichier de
+                    # code) -> json.loads() echoue ici (gere gracieusement),
+                    # MAIS 'appel' est le MEME objet deja stocke dans
+                    # self.historique (ligne ci-dessus) ; si on le laisse tel
+                    # quel, cette chaine cassee est renvoyee a l'API a CHAQUE
+                    # futur tour -> l'API la rejette encore et encore (HTTP 400
+                    # "Invalid \escape"), empoisonnant la session en PERMANENCE.
+                    # On la remplace par un JSON vide valide pour que la suite
+                    # de la conversation reste utilisable.
+                    appel["function"]["arguments"] = "{}"
                 else:
                     resultat = tools.executer_outil(nom, args, self.config)
 

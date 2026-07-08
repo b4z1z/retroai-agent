@@ -2037,3 +2037,39 @@ ETAT : TERMINEE ET VALIDEE.
   (### Linux / macOS, ### Windows) restaient deja correctement separees,
   inchangees.
   VERIF : 126 tests toujours OK (changement doc uniquement).
+
+----------------------------------------------------------------
+[2026-07-08] FIX CRITIQUE - Session empoisonnee en permanence par un
+             tool_call aux arguments JSON casses (genere par le modele)
+----------------------------------------------------------------
+PROBLEME REEL : en demandant a BAZIZ.IA de corriger app.js (fichier
+volumineux, plein de backslashes JS), le modele a genere un appel
+write_file dont les arguments JSON etaient mal echappes ("\i" n'est pas un
+escape JSON valide -> "Invalid \escape: line 1 column 3292"). Notre
+_parser_arguments() a bien intercepte l'erreur LOCALEMENT (json.loads leve
+JSONDecodeError, deja gere -> message d'erreur clair renvoye au modele,
+write_file jamais execute, app.js non corrompu). MAIS le tool_calls
+D'ORIGINE (avec ses arguments casses de 23 Ko) restait stocke tel quel dans
+self.historique -> renvoye a l'API a CHAQUE tour suivant -> l'API le
+rejetait ENCORE avec le MEME HTTP 400 -> session empoisonnee EN PERMANENCE,
+plus aucun /continue possible (boucle d'echec infinie).
+
+FIX : dans _dialoguer(), 'appel' (l'element du tool_calls) est le MEME objet
+deja stocke dans self.historique (pas une copie) -> des qu'on catch
+l'echec de parsing local, on mute appel["function"]["arguments"] = "{}"
+(JSON vide valide). Le message d'erreur informatif reste envoye au modele
+comme resultat d'outil ; seul le blob casse stocke pour les futurs tours
+est assaini.
+
+REPARATION IMMEDIATE : le fichier de session deja poisonne sur disque
+(sessions/20260708_031559.json, local, non commis) a ete corrige
+directement (1 entree assainie, verifiee re-serialisable) pour debloquer
+la reprise du travail en cours SANS perdre la conversation.
+
+TESTS (test_agent_loop_tool_calls.py, NOUVEAU, 5) : reproduit EXACTEMENT le
+JSON casse reel ; verifie qu'apres agent.envoyer(), les arguments stockes
+sont "{}" (pas le blob original) ; le modele est bien informe de l'echec ;
+tout l'historique reste serialisable ET rechargeable pour les tours
+suivants (simule ce que json.dumps+re-envoi a l'API ferait) ; sauver_session
+ne replante plus. 126 -> 131 tests, tous OK.
+ETAT : TERMINEE ET VALIDEE.
