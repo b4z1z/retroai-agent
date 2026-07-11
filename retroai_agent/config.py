@@ -45,7 +45,7 @@ class Config:
     # Genereux pour les taches multi-etapes (lire/ecrire/verifier/corriger).
     max_iterations: int = 25
     # Generation d'images (commande /create-image). Modele distinct du modele
-    # de chat : kimi-k2.6 ne SAIT PAS creer d'images. On utilise un modele de
+    # de chat : les modeles de chat ne creent pas d'images. On utilise un modele de
     # generation (FLUX) sur l'endpoint genai de NVIDIA, avec la MEME cle API.
     image_base_url: str = "https://ai.api.nvidia.com/v1/genai"
     image_model: str = "black-forest-labs/flux.1-dev"
@@ -149,7 +149,11 @@ def load_config(dotenv_path: str = ".env") -> Config:
             "NVIDIA_BASE_URL",
             "https://integrate.api.nvidia.com/v1/chat/completions",
         ),
-        model=os.environ.get("NVIDIA_MODEL", "moonshotai/kimi-k2.6"),
+        # Modele LIBRE : n'importe quel modele NVIDIA NIM supportant le
+        # tool-calling (pas seulement Moonshot). Defaut = nemotron-3-ultra
+        # (raisonnement + tools, verifie en reel : ~1-2s par tour la ou
+        # deepseek-v4-flash saturait). Reglable via NVIDIA_MODEL dans .env.
+        model=os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
         enable_thinking=_env_bool("ENABLE_THINKING", True),
         shell_timeout=_env_int("SHELL_TIMEOUT", 30),
         auto_safe_commands=_env_bool("AUTO_SAFE_COMMANDS", False),

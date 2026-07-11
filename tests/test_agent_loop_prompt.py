@@ -34,3 +34,14 @@ def test_linux_par_defaut(monkeypatch):
 def test_systeme_contient_la_description_plateforme():
     """SYSTEME doit inclure la vraie plateforme (pas 'Linux terminal' en dur)."""
     assert agent_loop._description_plateforme() in agent_loop.SYSTEME
+
+
+def test_systeme_impose_la_persistance_multi_etapes():
+    """Regression : l'agent annoncait un plan en N etapes puis s'arretait apres
+    l'etape 1. Le prompt doit explicitement lui dire de NE PAS rendre la main
+    entre les etapes et de continuer jusqu'a la fin du plan."""
+    s = agent_loop.SYSTEME
+    assert "KEEP GOING" in s
+    assert "next step" in s.lower()
+    # L'exception plan mode (lecture seule) doit rester documentee.
+    assert "plan mode" in s.lower()

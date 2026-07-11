@@ -2138,3 +2138,186 @@ ETAT : TERMINEE ET VALIDEE (a essayer en reel : /restart dans baziz.ia).
 TESTS : test_jetons.py (8 : printer/formats/usage SSE/accumulation tour vs
 session/reset/menu) + test 404 mapping. 131 -> 143, tous OK.
 ETAT : TERMINE ET VALIDE (y compris en reel contre l'API).
+
+----------------------------------------------------------------
+[2026-07-09] DOC : projet AGNOSTIQUE au modele (plus lie a kimi/Moonshot)
+----------------------------------------------------------------
+Suite a la panne kimi-k2.6 (404 cote NVIDIA), on assume que BAZIZ.IA marche
+avec N'IMPORTE QUEL modele du catalogue NVIDIA NIM, pas seulement Moonshot AI
+(DeepSeek, Llama/Meta, Qwen, Mistral...). Seule contrainte : le modele doit
+supporter le tool-calling (l'agent en a besoin pour agir).
+- Retest en reel ce jour : kimi-k2.6 -> 404 (toujours casse), kimi-k2-thinking
+  et kimi-k2-instruct -> 410 Gone, deepseek-v4-flash -> 200 (503 possible en
+  pic = saturation temporaire), meta/llama-3.3-70b -> 200.
+- Defaut change : moonshotai/kimi-k2.6 -> deepseek-ai/deepseek-v4-flash dans
+  config.py (+ commentaire "modele libre"), .env.example, README (intro +
+  encadre "n'importe quel modele NVIDIA", table config, lien build.nvidia.com
+  /models), tuto.py (accueil).
+- test_config.py aligne sur le nouveau defaut. 143 tests toujours OK.
+ETAT : TERMINE.
+
+----------------------------------------------------------------
+[2026-07-09] ROBUSTESSE : reessai auto sur TOUR VIDE (fin du "(empty response)")
+----------------------------------------------------------------
+SYMPTOME REEL : user tape "ameliore le projet aether", l'agent fait 1
+list_directory puis affiche "(empty response)" et abandonne.
+DIAGNOSTIC (reproduit en reel contre l'API deepseek-v4-flash) : le modele,
+sous charge, renvoie par intermittence une completion TOTALEMENT vide (ni
+content, ni tool_calls, finish_reason=null, rien streame) ; il renvoie aussi
+souvent des 503 "All workers busy". Le tour SUIVANT reussit presque toujours
+(teste : try0 content OK / try1 vide / etc.). Ce n'est PAS un bug de parsing.
+FIX (agent_loop._dialoguer) : sur un tour "degenere" (pas d'outil ET content
+vide ET finish != "length"), on N'enregistre PAS le tour dans l'historique et
+on RETENTE, jusqu'a AgentLoop.MAX_TOURS_VIDES (=3), avec un ui.info discret
+("Empty response — retrying x/3"). Au-dela, message d'aide clair (modele
+surcharge -> attendre, ou changer NVIDIA_MODEL puis /restart) au lieu de
+"(empty response)".
+TESTS : test_agent_loop_empty.py (2 : reessaie-puis-reussit + abandon propre).
+143 -> 145, tous OK.
+ETAT : TERMINE ET VALIDE (diagnostic confirme en reel).
+
+----------------------------------------------------------------
+[2026-07-09] ROBUSTESSE : reessai auto sur COUPURE RESEAU en plein streaming
+----------------------------------------------------------------
+SYMPTOME REEL : "Network error during streaming: ...Read timed out. Progress
+saved. Type /continue". deepseek-v4-flash surcharge stalle -> le read timeout
+(request_timeout) se declenche pendant iter_lines, souvent AVANT le 1er token.
+FIX (api_client) : nouvelle exception StreamingInterrompu(deja_streame=bool).
+_lire_flux traque 'a_streame' (vrai des qu'une bribe -raisonnement, contenu ou
+args d'outil- est produite) et, sur RequestException en plein flux, leve
+StreamingInterrompu en indiquant si qqch avait deja ete affiche. _chat_stream
+l'attrape : si RIEN n'a ete affiche ET qu'il reste des tentatives BACKOFF, il
+RELANCE un POST propre (aucune duplication a l'ecran) ; sinon (texte deja
+apparu ou tentatives epuisees) il remonte un TimeoutApiError -> /continue
+reprend sans rien perdre. Couvre le cas reel (stall avant 1er token = clean
+retry) sans risquer de re-afficher du texte deja vu.
+TESTS : test_api_client.py +4 (deja_streame False/True ; _chat_stream reessaie
+sans output / ne reessaie pas si deja affiche). 145 -> 149, tous OK.
+ETAT : TERMINE ET VALIDE.
+RAFFINEMENT (meme jour, apres 2e occurrence du read timeout) : la 1re version
+etait TROP conservatrice pour un modele de raisonnement -> 'a_streame' passait
+True des le 1er token de RAISONNEMENT, donc le reessai ne se declenchait
+JAMAIS (le read timeout tombe quasi toujours PENDANT le long thinking). Corrige
+: seul le 'content' (reponse finale affichee) bloque le reessai ; le
+raisonnement (jetable, non conserve) NE le bloque plus. Le reessai couvre
+desormais le cas reel (timeout pendant le thinking). +1 test (coupure pendant
+raisonnement = rejouable). 149 -> 150, tous OK.
+NOTE TERRAIN : congestion generale du tier gratuit NVIDIA ce soir (llama-3.3-70b
+= 24.9s pour un simple tool call, deepseek = read timeout). Pas un bug app.
+
+----------------------------------------------------------------
+[2026-07-09] PROMPT : persistance multi-etapes (l'agent finissait UNE etape)
+----------------------------------------------------------------
+SYMPTOME REEL : "ameliore le projet aether" -> l'agent annonce un plan en 8
+etapes, fait l'etape 1, puis S'ARRETE ("et ca na pas fait les autres step").
+CAUSE : la section METHOD disait "execute the steps ONE at a time ... move to
+the next step" -> le modele interpretait la fin d'etape comme un ARRET : il
+narrait l'etape 1 sans nouvel appel d'outil -> Cas 1 (pas d'outil) -> la boucle
+rend la main. Rien n'imposait de continuer jusqu'au bout.
+FIX (SYSTEME, agent_loop) : ajout d'un bloc "CRITICAL - KEEP GOING until the
+whole plan is DONE" : ne pas rendre la main entre les etapes, enchainer le
+prochain step dans le MEME tour, ne produire le resume final qu'APRES la
+derniere etape ; seule exception = plan mode (lecture seule). max_iterations=25
+laisse largement la place a ~8 etapes.
+TESTS : test_agent_loop_prompt.py +1 (le prompt impose la persistance + garde
+l'exception plan mode). 150 -> 151, tous OK.
+ETAT : TERMINE (a re-essayer en reel : relancer 'ameliore aether' apres restart).
+
+----------------------------------------------------------------
+[2026-07-09] "CONFIGURER deepseek COMME kimi" : reessai des 503 sature
+----------------------------------------------------------------
+Demande : adapter le client pour que le nouveau modele (deepseek-v4-flash)
+soit aussi stable que kimi l'etait, en reglant tous les problemes vecus.
+HYPOTHESE TESTEE PUIS REJETEE : le param KIMI 'chat_template_kwargs:{thinking:
+True}', envoye a deepseek, causerait les reponses vides. Mesure en reel (5
+essais/condition) : think=ON = 0 vide, think=OFF = 1 vide -> le param N'EST PAS
+la cause (think=ON meme legerement meilleur). Les vides sont de la congestion
+NVIDIA, aleatoire. => on NE touche PAS au param (kimi en a besoin, deepseek n'en
+souffre pas). Deja gere par les reessais tour-vide + read-timeout precedents.
+VRAI TROU TROUVE : sur un 503 "All workers busy / Worker local total request
+limit reached", le client ABANDONNAIT aussitot (raise MSG_SATURATION, 0 retry)
+alors que ce 503 est TRANSITOIRE (mes tests retentaient le 503 -> OK ~3s apres).
+FIX (api_client, _chat_simple ET _chat_stream) : le 503 sature est desormais
+RETENTE avec backoff [5,10,20]s (comme les 429) ; message clair seulement apres
+epuisement. C'est le reglage qui rend deepseek reellement utilisable malgre la
+congestion.
+TESTS : test_api_client.py +3 (retry 503 simple + stream + abandon apres N).
+151 -> 154, tous OK.
+BILAN robustesse deepseek : 429 (retry), 503 sature (retry, NOUVEAU), tour vide
+(retry), read timeout streaming avant contenu final (retry), 404 modele
+(message clair). ETAT : TERMINE ET VALIDE.
+
+----------------------------------------------------------------
+[2026-07-09] NOUVEAU MODELE PAR DEFAUT : nvidia/nemotron-3-ultra-550b-a55b
+----------------------------------------------------------------
+Choix de BAZIZ (via build.nvidia.com) : nemotron-3-ultra remplace deepseek-
+v4-flash comme modele par defaut. VALIDE EN REEL avant bascule, tous les
+points sensibles passes :
+  - dispo : HTTP 200 en 0.8s (deepseek : 503/timeouts frequents) ;
+  - tool-calling : appel propre en 1.1s ;
+  - piege NIM (tool result reinjecte en role user) : OK, vraie reponse ;
+  - chat_template_kwargs {thinking:True} (param kimi) : accepte sans erreur ;
+  - streaming SSE via ApiClient du projet : raisonnement streame + contenu
+    final, 1.7-1.8s par tour ; flux complet agent (ask->tool->reinject->
+    reponse) OK. AUCUN changement de plomberie necessaire : le modele est
+    nativement compatible avec toute l'archi existante (reasoning_content,
+    tools, streaming). C'est un modele de raisonnement (comme kimi).
+BASCULE : .env (NVIDIA_MODEL), config.py (defaut + commentaire), .env.example,
+README (encadre + table), test_config.py. Verification finale de bout en bout
+avec le .env reel : modele charge = nemotron, reponse streamee OK.
+Les protections des jours precedents (retry 429/503/tour vide/read timeout,
+prompt persistance) restent actives et servent de filet de securite.
+154 tests, tous OK.
+ETAT : TERMINE ET VALIDE EN REEL. (Dans BAZIZ.IA deja ouvert : /restart pour
+charger le nouveau modele.)
+
+----------------------------------------------------------------
+[2026-07-11] UX /btw : panneau pedagogique + GOODBYE utile + session LIVE
+----------------------------------------------------------------
+Demandes utilisateur (apres screenshot /btw + GOODBYE) :
+1) /btw PLUS PEDAGOGIQUE (ui.afficher_jetons) : sections "What am I looking
+   at?" (token ~ morceau de mot ~4 chars ; in = LU, out = ECRIT, thinking =
+   raisonnement cache ; ~ = estime, ? = usage non fourni) et "Good to know"
+   (compteur live dans le spinner ; credits NVIDIA factures PAR APPEL API,
+   1 appel = 1 credit, PAS par token ; rien n'est perdu en quittant ->
+   /continue). Version repli texte alignee.
+2) GOODBYE (ui.au_revoir) explique COMMENT REVENIR si on change d'avis :
+   "Everything is saved - run baziz.ia again, then /continue to resume (or
+   /sessions to browse)" sous le logo pixel.
+3) /btw PENDANT le thinking, facon Claude Code : le spinner devient
+   "Thinking… 12s · ~52 tok · session ~2.9k" -> compteur de raisonnement du
+   flux EN COURS + TOTAL SESSION live. Mecanique : ui.creer_stream_printer(
+   session_tokens=callable) (param optionnel, retro-compatible) ; agent_loop
+   fournit _total_session_estime() (sortie reelle sinon estimee + raisonnement
+   estime) ; ui ajoute les tokens du flux en cours ; _fmt_tokens compact
+   (2867 -> "2.9k") ; un callable session qui leve une exception ne casse
+   JAMAIS le streaming (try/except). AIDE_LOGICIEL mis a jour (l'agent-manuel
+   decrit le compteur live).
+   NOTE conception : pas de touche interactive pendant le thinking (lecture
+   clavier concurrente risquee multi-plateforme) ; le compteur PERMANENT dans
+   le spinner rend l'interaction inutile — c'est exactement le comportement
+   de Claude Code.
+TESTS : test_jetons.py +5 (_fmt_tokens, suffixe avec session, callable en
+panne ne plante pas, _total_session_estime reel/estime, GOODBYE contient
+/continue). 154 -> 159, tous OK.
+ETAT : TERMINE. (/restart pour voir le nouveau spinner.)
+
+----------------------------------------------------------------
+[2026-07-11] HISTORIQUE DE SAISIE persistant (fleche HAUT, facon Claude Code)
+----------------------------------------------------------------
+L'utilisateur se souvenait d'un "truc d'historique" pas fini. Etat des lieux :
+l'historique des CONVERSATIONS (multi-sessions /sessions//continue) etait
+fait (2026-07-06), mais l'historique de SAISIE ne l'etait qu'a moitie : la
+PromptSession n'avait pas d'history -> fleche HAUT ne retrouvait les messages
+QUE de la session en cours, tout etait oublie au redemarrage.
+FIX (ui.py, _obtenir_session) : PromptSession(history=FileHistory(
+"input_history.txt"), auto_suggest=AutoSuggestFromHistory()). Resultat :
+fleche HAUT/BAS parcourt les messages de TOUS les lancements precedents, et
+une suggestion "fantome" grise (completee depuis l'historique) s'accepte avec
+fleche DROITE — exactement le comportement de Claude Code. Fichier local au
+projet, ajoute au .gitignore (donnees perso, comme user_profile.json). Si le
+fichier est illisible -> repli silencieux sur l'historique memoire. Ne
+concerne que le chemin prompt_toolkit (le repli input() reste inchange).
+TESTS : test_ui_historique.py (3 : constante, imports presents si PTK,
+gitignore contient input_history.txt). 159 -> 162, tous OK.
+ETAT : TERMINE. (/restart puis fleche HAUT pour verifier.)

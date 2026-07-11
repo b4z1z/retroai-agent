@@ -25,7 +25,7 @@ def test_valeurs_par_defaut(monkeypatch):
 
     cfg = config.load_config(dotenv_path=_PAS_DE_ENV)
     assert cfg.api_key == "nvapi-test"
-    assert cfg.model == "moonshotai/kimi-k2.6"
+    assert cfg.model == "nvidia/nemotron-3-ultra-550b-a55b"
     assert cfg.shell_timeout == 30
     assert cfg.enable_thinking is True
     assert cfg.auto_safe_commands is False

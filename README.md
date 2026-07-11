@@ -1,9 +1,15 @@
 # RetroAI Agent
 
 Client CLI **léger** transformant un terminal (Windows, Linux ou macOS) en
-**agent autonome** propulsé par l'API **NVIDIA NIM** (modèle
-`moonshotai/kimi-k2.6`). Pensé pour rester léger et tourner même sur une
-machine modeste.
+**agent autonome** propulsé par l'API **NVIDIA NIM**. Pensé pour rester léger
+et tourner même sur une machine modeste.
+
+> 🧩 **N'importe quel modèle du catalogue NVIDIA NIM** — pas seulement Moonshot
+> AI. Vous choisissez librement via `NVIDIA_MODEL` dans `.env` : DeepSeek, Llama
+> (Meta), Qwen, Mistral, Moonshot… La seule condition est que le modèle supporte
+> le **tool-calling** (function calling), dont l'agent a besoin pour agir. La
+> liste complète est sur <https://build.nvidia.com/models>. Défaut :
+> `nvidia/nemotron-3-ultra-550b-a55b` (raisonnement + tool-calling, rapide).
 
 100 % ligne de commande, sans framework lourd. Dépendance principale :
 `requests`. L'agent peut lire/écrire des fichiers, lister des répertoires et
@@ -148,7 +154,7 @@ dans `.env` (ignoré par git) ou dans une variable d'environnement.
 |--------------------|:-----------:|-------------------------------------------------------------|----------------------------------------------|
 | `NVIDIA_API_KEY`   | ✅          | —                                                           | Votre clé API NVIDIA NIM.                    |
 | `NVIDIA_BASE_URL`  | ❌          | `https://integrate.api.nvidia.com/v1/chat/completions`      | Endpoint chat/completions.                   |
-| `NVIDIA_MODEL`     | ❌          | `moonshotai/kimi-k2.6`                                       | Modèle interrogé.                            |
+| `NVIDIA_MODEL`     | ❌          | `nvidia/nemotron-3-ultra-550b-a55b`                         | **N'importe quel** modèle NVIDIA NIM (tool-calling requis). Voir build.nvidia.com/models. |
 | `ENABLE_THINKING`  | ❌          | `true`                                                      | Active le mode raisonnement.                 |
 | `SHELL_TIMEOUT`    | ❌          | `30`                                                        | Délai max (s) d'une commande shell.          |
 | `AUTO_SAFE_COMMANDS` | ❌        | `false`                                                     | Auto-exécute les commandes shell **lecture seule** sûres (`ls`, `cat`, `echo`, `find`, `grep`…) sans confirmation. |

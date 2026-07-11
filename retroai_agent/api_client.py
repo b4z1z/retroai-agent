@@ -51,6 +51,21 @@ class TimeoutApiError(ApiError):
     """
 
 
+class StreamingInterrompu(ApiError):
+    """
+    Coupure reseau PENDANT la lecture du flux SSE (ex. read timeout : le
+    serveur stalle, vecu en reel avec deepseek-v4-flash surcharge).
+
+    Porte 'deja_streame' : si RIEN n'a encore ete affiche a l'ecran, on peut
+    relancer l'appel proprement (aucune duplication). Si du texte etait deja
+    apparu, relancer le re-afficherait -> on laisse plutot /continue reprendre.
+    """
+
+    def __init__(self, message: str, *, deja_streame: bool) -> None:
+        super().__init__(message)
+        self.deja_streame = deja_streame
+
+
 # Message court et clair : limite NIM atteinte. Couvre les deux cas possibles
 # (capacite du worker saturee OU quota d'utilisation epuise) car le client ne
 # peut pas les distinguer de facon fiable.
@@ -267,11 +282,20 @@ class ApiClient:
                     f"{len(BACKOFF_DELAIS)} retries. Giving up."
                 )
 
-            # --- Limite NIM atteinte (capacite worker OU quota) ----------
-            # (ex. "ResourceExhausted: Worker local total request limit").
-            # Pas de retry : reessayer ne debloque pas une limite atteinte.
-            # On affiche un message clair tout de suite.
+            # --- Serveur sature (503 "All workers busy" / "Worker local total
+            # request limit reached") -> TRANSITOIRE : on reessaie avec backoff
+            # (verifie en reel : deepseek-v4-flash renvoie souvent ce 503, et
+            # l'appel suivant quelques secondes plus tard passe). Ce n'est
+            # qu'apres avoir epuise les reessais qu'on rend un message clair.
             if reponse.status_code >= 500 and _est_saturation(reponse.text):
+                if tentative < len(BACKOFF_DELAIS):
+                    delai = BACKOFF_DELAIS[tentative]
+                    print(
+                        f"  [API] Server at capacity (503). "
+                        f"Retrying in {delai}s..."
+                    )
+                    time.sleep(delai)
+                    continue
                 raise ApiError(MSG_SATURATION)
 
             # --- Modele indisponible cote NVIDIA (404 Function not found) -
@@ -329,7 +353,16 @@ class ApiClient:
                     time.sleep(delai)
                     continue
                 raise ApiError("Rate limit (429) still active. Giving up.")
+            # 503 sature = transitoire -> reessai backoff (cf. _chat_simple).
             if reponse.status_code >= 500 and _est_saturation(reponse.text):
+                if tentative < len(BACKOFF_DELAIS):
+                    delai = BACKOFF_DELAIS[tentative]
+                    print(
+                        f"  [API] Server at capacity (503). "
+                        f"Retrying in {delai}s..."
+                    )
+                    time.sleep(delai)
+                    continue
                 raise ApiError(MSG_SATURATION)
             if reponse.status_code == 404 and _est_modele_introuvable(reponse.text):
                 raise ApiError(_message_modele_introuvable(self.config.model))
@@ -339,7 +372,23 @@ class ApiClient:
                     f"{reponse.text[:500]}"
                 )
 
-            return self._lire_flux(reponse, on_texte)
+            try:
+                return self._lire_flux(reponse, on_texte)
+            except StreamingInterrompu as exc:
+                # Coupure reseau en plein flux. Si RIEN n'a encore ete affiche
+                # et qu'il reste des tentatives, on relance proprement (nouvel
+                # appel POST) : aucune duplication a l'ecran. Sinon (du texte
+                # deja apparu, ou plus de tentatives) on remonte l'erreur ->
+                # l'utilisateur reprend avec /continue sans rien perdre.
+                if not exc.deja_streame and tentative < len(BACKOFF_DELAIS):
+                    delai = BACKOFF_DELAIS[tentative]
+                    print(
+                        f"  [API] Streaming cut before any output "
+                        f"(likely an overloaded server). Retrying in {delai}s..."
+                    )
+                    time.sleep(delai)
+                    continue
+                raise TimeoutApiError(str(exc)) from exc
 
         raise ApiError("Unexpected API call failure.")
 
@@ -357,6 +406,15 @@ class ApiClient:
         outils: dict = {}
         finish = None
         usage = None
+        # Vrai des qu'un morceau de la REPONSE FINALE (content) a ete affiche.
+        # Sert a decider si une coupure reseau est rejouable : le RAISONNEMENT
+        # (thinking) est jetable et non conserve -> le rejouer ne fait que
+        # re-afficher une reflexion, sans dupliquer de vraie reponse. Seul le
+        # 'content' deja montre a l'ecran interdit un reessai propre. C'est le
+        # cas FREQUENT avec un modele de raisonnement lent (deepseek-v4-flash) :
+        # le read timeout tombe pendant le long thinking -> on DOIT pouvoir
+        # relancer meme si du raisonnement a deja defile.
+        a_streame = False
         try:
             for ligne in reponse.iter_lines(decode_unicode=True):
                 if not ligne:
@@ -380,10 +438,11 @@ class ApiClient:
                 # pour que l'utilisateur VOIE que le modele travaille.
                 frag_pense = delta.get("reasoning_content") or delta.get("reasoning")
                 if frag_pense and on_texte:
-                    on_texte(frag_pense, True)
+                    on_texte(frag_pense, True)  # raisonnement : NE bloque PAS le reessai
                 frag = delta.get("content")
                 if frag:
                     contenu += frag
+                    a_streame = True  # vraie reponse affichee -> plus rejouable
                     if on_texte:
                         on_texte(frag, False)
                 for tc in (delta.get("tool_calls") or []):
@@ -403,7 +462,12 @@ class ApiClient:
                 if choix.get("finish_reason"):
                     finish = choix["finish_reason"]
         except requests.exceptions.RequestException as exc:
-            raise ApiError(f"Network error during streaming: {exc}") from exc
+            # Coupure reseau en plein flux (souvent un read timeout : le serveur
+            # stalle). Rejouable SEULEMENT si rien n'a encore ete affiche.
+            raise StreamingInterrompu(
+                f"Network error during streaming: {exc}",
+                deja_streame=a_streame,
+            ) from exc
 
         message = {"role": "assistant", "content": _reparer_texte(contenu)}
         if outils:

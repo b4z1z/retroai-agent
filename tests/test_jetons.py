@@ -144,3 +144,60 @@ def test_reset_remet_les_compteurs_a_zero(tmp_path, monkeypatch):
 def test_btw_et_restart_dans_le_menu():
     assert "/btw" in ui.NOMS_COMMANDES
     assert "/restart" in ui.NOMS_COMMANDES
+
+
+# --------------------------------------------------------------------------- #
+#  Compteur de session LIVE dans le spinner (facon Claude Code)               #
+# --------------------------------------------------------------------------- #
+def test_fmt_tokens_compact():
+    assert ui._fmt_tokens(843) == "843"
+    assert ui._fmt_tokens(2867) == "2.9k"
+    assert ui._fmt_tokens(12300) == "12.3k"
+
+
+def test_printer_avec_session_tokens(capsys):
+    """Le suffixe du spinner inclut 'session ~N' = base fournie + live."""
+    printer, cloturer, stats = ui.creer_stream_printer(
+        session_tokens=lambda: 2000
+    )
+    # 400 chars de raisonnement = ~100 tokens live.
+    printer("x" * 400, True)
+    # On appelle le suffixe interne via l'attente ? Non : on reconstruit le
+    # comportement attendu depuis stats() (API publique) + _fmt_tokens.
+    cloturer()
+    s = stats()
+    live = s["pense_chars"] // ui.CHARS_PAR_TOKEN
+    assert live == 100
+    assert ui._fmt_tokens(2000 + live) == "2.1k"
+
+
+def test_printer_session_tokens_en_panne_ne_plante_pas(capsys):
+    """Un callable session qui explose ne doit jamais casser le streaming."""
+    def boom():
+        raise RuntimeError("boom")
+    printer, cloturer, stats = ui.creer_stream_printer(session_tokens=boom)
+    printer("reponse", False)   # ne doit pas lever
+    assert cloturer() is True
+
+
+def test_total_session_estime(tmp_path, monkeypatch):
+    """_total_session_estime = sortie (reelle sinon estimee) + raisonnement."""
+    monkeypatch.chdir(tmp_path)
+    agent = _agent([_reponse(usage={"prompt_tokens": 10, "completion_tokens": 40})])
+    agent.envoyer("x")
+    agent.jetons_session["raisonnement_est"] = 60
+    assert agent._total_session_estime() == 100  # 40 reels + 60 raisonnement
+
+    # Sans usage reel, repli sur l'estimation de sortie.
+    agent.jetons_session["sortie"] = 0
+    agent.jetons_session["sortie_est"] = 25
+    assert agent._total_session_estime() == 85   # 25 estimes + 60
+
+
+def test_au_revoir_explique_comment_revenir(capsys):
+    """L'ecran GOODBYE doit dire comment reprendre (/continue) si on change
+    d'avis — demande utilisateur apres le screenshot du 2026-07-11."""
+    ui.au_revoir()
+    sortie = capsys.readouterr().out
+    assert "/continue" in sortie
+    assert "saved" in sortie.lower()

@@ -85,7 +85,16 @@ SYSTEME = (
     "do that step's tool calls (ONE file or one coherent part per step), then "
     "move to the next step. Never dump the whole project in a single giant "
     "response: small incremental steps keep the progress safe (it is saved "
-    "after every step and can be resumed with /continue)."
+    "after every step and can be resumed with /continue).\n"
+    "CRITICAL - KEEP GOING until the whole plan is DONE. After finishing a "
+    "step, do NOT stop and do NOT hand control back to the user: immediately "
+    "start the NEXT step's tool calls in the SAME turn. Announcing a step is "
+    "not doing it - a step is only done once its write_file/other tool calls "
+    "have run. Do not end your turn with a message like 'let's continue' or "
+    "'next I will...' and then stop; actually continue. Only produce your "
+    "final text summary AFTER the LAST step's tools have run. The single "
+    "exception is plan mode (read-only): there you present the plan and stop, "
+    "because you are not allowed to make changes."
 )
 
 # Identite du CREATEUR de l'agent (connaissance permanente, grave dans le
@@ -173,8 +182,9 @@ AIDE_LOGICIEL = (
     "- /btw : a fun token meter — shows how many tokens the LAST turn and "
     "the whole session used (input/output, plus an estimated count for the "
     "hidden reasoning). Values marked ~ are client-side estimates. The live "
-    "'Thinking…' spinner also shows an estimated reasoning-token counter "
-    "while the model thinks.\n"
+    "'Thinking…' spinner shows the SAME counters in real time while the "
+    "model thinks (current reasoning tokens + running session total), so "
+    "there is no need to wait for the turn to end to check consumption.\n"
     "- /exit or /quit : quit the program.\n"
     "To send an image FOR YOU TO ANALYZE: use /add-image, or /paste, or simply "
     "mention an existing image file path (or an http(s) image URL) inside your "
@@ -190,6 +200,11 @@ AIDE_LOGICIEL = (
 
 class AgentLoop:
     """Gere l'historique et le cycle complet d'un echange avec l'agent."""
+
+    # Nombre de tours COMPLETEMENT vides (ni contenu, ni outil) tolerés
+    # d'affilee avant d'abandonner. Un modele surcharge (ex. deepseek-v4-flash)
+    # renvoie parfois du vide ; le tour suivant reussit presque toujours.
+    MAX_TOURS_VIDES = 3
 
     def __init__(
         self,
@@ -341,7 +356,11 @@ class AgentLoop:
         + appel interruptible + 1 reessai sur erreur reseau.
         """
         if self.config.stream:
-            printer, cloturer, stats = ui.creer_stream_printer()
+            # Le spinner affiche le total de session EN DIRECT (facon Claude
+            # Code) : tokens deja comptabilises + ceux du flux en cours.
+            printer, cloturer, stats = ui.creer_stream_printer(
+                session_tokens=self._total_session_estime
+            )
             self._stream_affiche = False
             try:
                 reponse = self.client.chat(
@@ -375,6 +394,16 @@ class AgentLoop:
                     ui.info("Network issue — retrying automatically…")
         # Les deux tentatives ont echoue.
         raise derniere_erreur  # type: ignore[misc]
+
+    def _total_session_estime(self) -> int:
+        """
+        Total de tokens GENERES sur la session (reels si l'API les a fournis,
+        sinon estimes), AVANT l'appel en cours. Sert au compteur live du
+        spinner ("session ~N") : ui y ajoute les tokens du flux en cours.
+        """
+        s = self.jetons_session
+        sortie = s["sortie"] or s["sortie_est"]
+        return sortie + s["raisonnement_est"]
 
     def _comptabiliser(self, reponse: dict, flux: dict | None) -> None:
         """
@@ -476,6 +505,12 @@ class AgentLoop:
 
     def _dialoguer(self) -> str:
         """Boucle de dialogue : appels API + execution d'outils."""
+        # Certains modeles (vecu en reel avec deepseek-v4-flash sous charge)
+        # renvoient par intermittence un tour COMPLETEMENT vide : pas de
+        # contenu, pas de tool_calls, finish_reason null, rien streame. Le
+        # tour d'apres reussit presque toujours. On reessaie donc quelques
+        # fois AVANT d'abandonner, au lieu d'afficher un "(empty response)".
+        vides_consecutifs = 0
         for _ in range(self.config.max_iterations):
             reponse = self._appel_api()
 
@@ -502,6 +537,24 @@ class AgentLoop:
                     )
                     # Message synthetique : il n'a PAS ete streame a l'ecran,
                     # main doit donc l'afficher.
+                    self._stream_affiche = False
+                # Tour vide "degenere" (ni contenu, ni outil, coupure != length)
+                # -> hoquet serveur/modele. On NE l'enregistre PAS dans
+                # l'historique et on retente, jusqu'a MAX_TOURS_VIDES.
+                elif not contenu.strip():
+                    vides_consecutifs += 1
+                    if vides_consecutifs <= self.MAX_TOURS_VIDES:
+                        ui.info(
+                            f"Empty response from the model — retrying "
+                            f"({vides_consecutifs}/{self.MAX_TOURS_VIDES})…"
+                        )
+                        continue
+                    contenu = (
+                        "[The model returned an empty response several times "
+                        "in a row. This usually means the model is overloaded "
+                        "(NVIDIA capacity) — wait a moment and retry, or switch "
+                        "NVIDIA_MODEL in .env then /restart.]"
+                    )
                     self._stream_affiche = False
                 self.historique.append({"role": "assistant", "content": contenu})
                 return contenu

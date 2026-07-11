@@ -24,7 +24,7 @@ CHEMIN_MARQUEUR = "tuto_complete.json"
 # est un tour rapide, pas un manuel complet (/help reste la reference).
 ETAPES = [
     ("Welcome to BAZIZ.IA", [
-        "BAZIZ.IA is an autonomous terminal agent (NVIDIA NIM / kimi-k2.6).",
+        "BAZIZ.IA is an autonomous terminal agent (any NVIDIA NIM model).",
         "It can read/write files, run shell commands, generate images, and more.",
         "This quick tour takes about a minute — replay it anytime with /tuto.",
     ]),
