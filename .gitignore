@@ -12,6 +12,9 @@ session_history.json*
 # Marqueur local : le tutoriel /tuto a deja ete montre une fois.
 tuto_complete.json
 
+# Historique de saisie (fleche haut, persistant entre lancements).
+input_history.txt
+
 # Images generees par /create-image (sorties locales).
 generated_images/
 

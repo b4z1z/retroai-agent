@@ -77,13 +77,21 @@ def _rafraichir_console() -> None:
 try:
     from prompt_toolkit import PromptSession
     from prompt_toolkit.application import run_in_terminal
+    from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
     from prompt_toolkit.completion import Completer, Completion
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.key_binding import KeyBindings
 
     PTK_DISPO = True
 except ImportError:  # pragma: no cover
     PTK_DISPO = False
+
+
+# Historique de SAISIE persistant (fleche HAUT pour retrouver ses anciens
+# messages, comme Claude Code), conserve d'un lancement a l'autre. Fichier
+# local au projet (comme user_profile.json / sessions/), gitignore.
+FICHIER_HISTORIQUE_SAISIE = "input_history.txt"
 
 
 # Palette : accent rouge.
@@ -143,10 +151,21 @@ if PTK_DISPO:
                     modes.cycler()
                     run_in_terminal(mode_actuel)  # texte simple au-dessus du prompt
 
+                # Historique de saisie PERSISTANT (fleche HAUT/BAS retrouve
+                # les messages des lancements precedents) + suggestion
+                # "fantome" grise depuis l'historique (fleche DROITE pour
+                # accepter), comme Claude Code. Si le fichier est illisible,
+                # on retombe sur l'historique memoire (perdu en quittant).
+                try:
+                    historique = FileHistory(FICHIER_HISTORIQUE_SAISIE)
+                except Exception:
+                    historique = None
                 _session = PromptSession(
                     completer=_CommandeCompleter(),
                     complete_while_typing=True,
                     key_bindings=kb,
+                    history=historique,
+                    auto_suggest=AutoSuggestFromHistory(),
                 )
             except Exception:
                 return None
@@ -211,9 +230,15 @@ def _texte_pixel(texte: str) -> str:
 
 
 def au_revoir() -> None:
-    """Affiche un grand 'GOODBYE' facon logo, centre, pour dire au revoir."""
+    """
+    Affiche un grand 'GOODBYE' facon logo, centre, PUIS explique comment
+    revenir (demande utilisateur : "si je change d'avis") : tout est deja
+    sauvegarde, relancer l'app + /continue reprend exactement ou on en etait.
+    """
     art = _texte_pixel("GOODBYE")
     lignes = art.split("\n")
+    retour = ("Changed your mind? Everything is saved — run baziz.ia again, "
+              "then /continue to resume (or /sessions to browse).")
     if RICH_DISPO:
         largeur = _largeur_visible()
         bloc = max(len(ligne) for ligne in lignes)
@@ -222,8 +247,11 @@ def au_revoir() -> None:
         for ligne in lignes:
             _console.print(Text(marge + ligne, style=f"bold {ACCENT}"))
         _console.print()
+        _console.print(Text(retour, style=DIM), justify="center")
+        _console.print()
     else:
         print("\n" + art + "\n")
+        print(retour + "\n")
 
 
 def saluer(pseudo: str) -> None:
@@ -349,14 +377,27 @@ class _Attente:
 CHARS_PAR_TOKEN = 4
 
 
-def creer_stream_printer():
+def _fmt_tokens(n: int) -> str:
+    """Format compact d'un compte de tokens : 843 -> '843', 2867 -> '2.9k'."""
+    if n >= 1000:
+        return f"{n / 1000:.1f}k"
+    return str(n)
+
+
+def creer_stream_printer(session_tokens=None):
     """
     Cree (printer, cloturer, stats) pour afficher une reponse EN DIRECT.
 
     Le RAISONNEMENT (mode thinking) n'est PAS affiche : pendant que le modele
-    reflechit, le spinner "Thinking… Ns · ~T tok" tourne, avec un COMPTEUR DE
-    TOKENS estime en direct (caracteres de raisonnement recus / 4). La
+    reflechit, le spinner "Thinking… Ns · ~T tok · session ~S" tourne, facon
+    Claude Code : compteur de TOKENS estime en direct (caracteres de
+    raisonnement recus / 4) + TOTAL de la session mis a jour en continu. La
     REPONSE, elle, s'affiche au fil de l'eau sous l'en-tete "⏺ BAZIZ.IA".
+
+    session_tokens : callable optionnel -> tokens deja consommes AVANT cet
+    appel (fourni par agent_loop) ; on y ajoute le live pour afficher le
+    total de session pendant que le modele pense (le /btw du pauvre, sans
+    attendre la fin du tour).
 
     printer(fragment, reflexion=False) ; cloturer() -> True si une REPONSE a
     ete affichee ; stats() -> {"pense_chars": N, "reponse_chars": M} (sert au
@@ -365,9 +406,23 @@ def creer_stream_printer():
     compteur = {"pense_chars": 0, "reponse_chars": 0}
 
     def _suffixe_tokens() -> str:
-        if compteur["pense_chars"] == 0:
-            return ""
-        return f" · ~{compteur['pense_chars'] // CHARS_PAR_TOKEN} tok"
+        vivant = (compteur["pense_chars"] + compteur["reponse_chars"]) \
+            // CHARS_PAR_TOKEN
+        morceaux = []
+        if compteur["pense_chars"]:
+            morceaux.append(
+                f" · ~{_fmt_tokens(compteur['pense_chars'] // CHARS_PAR_TOKEN)}"
+                " tok"
+            )
+        if session_tokens is not None:
+            try:
+                base = int(session_tokens() or 0)
+            except Exception:
+                base = 0
+            total = base + vivant
+            if total:
+                morceaux.append(f" · session ~{_fmt_tokens(total)}")
+        return "".join(morceaux)
 
     attente = _Attente(extra=_suffixe_tokens)
     attente.demarrer()
@@ -710,15 +765,48 @@ def afficher_jetons(tour: dict, session: dict) -> None:
         t.append("Session   : ", style=DIM)
         t.append(_ligne_jetons(session), style="default")
         t.append(f"   ({session['appels']} API calls)\n\n", style=DIM)
-        t.append("~ values are client-side estimates (≈4 chars/token); "
-                 "'?' = the API did not report usage.", style=DIM)
+        t.append("What am I looking at?\n", style=f"bold {DIM}")
+        t.append(
+            "  A token ≈ a piece of a word (~4 characters). "
+            "in = what the model READ (your messages + history), "
+            "out = what it WROTE, thinking = its hidden reasoning.\n",
+            style=DIM,
+        )
+        t.append(
+            "  ~ values are client-side estimates; "
+            "'?' = the API did not report usage.\n\n",
+            style=DIM,
+        )
+        t.append("Good to know\n", style=f"bold {DIM}")
+        t.append(
+            "  · Live view: the 'Thinking…' spinner shows these counters in "
+            "real time — no need to wait for the turn to end.\n",
+            style=DIM,
+        )
+        t.append(
+            "  · Your NVIDIA free credits are counted per API CALL "
+            "(1 call = 1 credit), NOT per token — big model or small, "
+            "same price.\n",
+            style=DIM,
+        )
+        t.append(
+            "  · Tokens are never lost when you quit: /exit saves everything, "
+            "and /continue picks the session back up.",
+            style=DIM,
+        )
         _console.print()
         _console.print(Panel(t, border_style=DIM, padding=(1, 4), expand=True))
     else:
         print("\n[btw - token meter]")
         print(f"  Last turn : {_ligne_jetons(tour)}")
         print(f"  Session   : {_ligne_jetons(session)}  ({session['appels']} API calls)")
+        print("  A token = a piece of a word (~4 chars). in = read, out = "
+              "written, thinking = hidden reasoning.")
         print("  (~ = estimate, ? = usage not reported by the API)")
+        print("  Live view: the 'Thinking…' spinner shows these counters in "
+              "real time.")
+        print("  NVIDIA free credits count API CALLS (1 call = 1 credit), "
+              "not tokens.")
 
 
 def niveau_thinking(niveau: str) -> None:
