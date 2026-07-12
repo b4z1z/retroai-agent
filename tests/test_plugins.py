@@ -133,20 +133,25 @@ def test_outil_inconnu_reste_une_erreur_propre():
 
 
 # ----------------------------------------------------------------------- #
-#  Les 2 plugins exemples LIVRES doivent respecter le contrat.            #
+#  Les plugins du CATALOGUE (marketplace/plugins/) doivent respecter le    #
+#  contrat. NB : on ne teste PAS le dossier plugins/ local — c'est un      #
+#  espace UTILISATEUR vivant (l'agent y cree ses propres plugins).         #
 # ----------------------------------------------------------------------- #
-def test_plugins_exemples_livres_valides():
-    racine = os.path.join(os.path.dirname(__file__), "..", "plugins")
-    nb, erreurs = plugins.charger(racine)
+_CATALOGUE = os.path.join(os.path.dirname(__file__), "..",
+                          "marketplace", "plugins")
+
+
+def test_plugins_du_catalogue_valides():
+    nb, erreurs = plugins.charger(_CATALOGUE)
     assert erreurs == []
-    assert nb == 2
+    assert nb == 4
     noms = {p["nom"] for p in plugins.liste()}
-    assert noms == {"get_weather", "calculate"}
+    assert noms == {"get_weather", "calculate", "current_datetime",
+                    "system_info"}
 
 
 def test_calculatrice_exacte_et_sure():
-    racine = os.path.join(os.path.dirname(__file__), "..", "plugins")
-    plugins.charger(racine)
+    plugins.charger(_CATALOGUE)
     assert plugins.executer("calculate",
                             {"expression": "17*23 - 19*21"}, CFG) \
         == "17*23 - 19*21 = -8"

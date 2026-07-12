@@ -23,6 +23,14 @@ generated_images/
 # (Le prompt systeme dit a l'agent de creer ses projets dans ce dossier.)
 outputs/
 
+# Plugins : espace PERSO local. Seuls les 2 exemples livres + le guide sont
+# versionnes ; vos plugins (et ceux que l'agent se cree) restent PRIVES.
+# Pour PARTAGER un plugin : pull request dans marketplace/ (voir son README).
+plugins/*
+!plugins/README.md
+!plugins/meteo.py
+!plugins/calculatrice.py
+
 # Python
 __pycache__/
 *.py[cod]
