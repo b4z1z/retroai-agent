@@ -2321,3 +2321,25 @@ concerne que le chemin prompt_toolkit (le repli input() reste inchange).
 TESTS : test_ui_historique.py (3 : constante, imports presents si PTK,
 gitignore contient input_history.txt). 159 -> 162, tous OK.
 ETAT : TERMINE. (/restart puis fleche HAUT pour verifier.)
+
+----------------------------------------------------------------
+[2026-07-11] DOSSIER outputs/ : les creations de BAZIZ.IA hors du repo git
+----------------------------------------------------------------
+Idee utilisateur pour en finir avec le piege recurrent (3 mentions au
+journal !) des artefacts de test commites par accident (pingpong.asm,
+snake_game/, et aether-observatory//taskflow/ re-stages en douce par des
+git add .) :
+1) Dossier outputs/ cree, AJOUTE AU .gitignore -> tout ce que BAZIZ.IA cree
+   (jeux, sites, projets) vit la et ne part JAMAIS sur GitHub.
+2) MENAGE : aether-observatory/, taskflow/, snake_game/, PINGPONG.EXE/.OBJ,
+   pingpong.asm DEPLACES dans outputs/ ; ceux qui etaient deja suivis par git
+   (snake_game, pingpong*) RETIRES du suivi (git rm --cached, fichiers
+   conserves sur disque). La racine du repo ne contient plus que le logiciel.
+3) PROMPT SYSTEME (section OUTPUTS) : l'agent cree desormais tout NOUVEAU
+   projet dans outputs/<nom>/ (write_file cree les dossiers manquants),
+   jamais a la racine ; exceptions = chemin explicite donne par l'utilisateur
+   ou projet existant (on travaille la ou il vit).
+TESTS : test_agent_loop_prompt.py +1 (le prompt impose outputs/). 162 -> 163.
+REPONSE A LA QUESTION DU JOUR : git push envoie TOUS les commits locaux
+d'avance d'un coup (13 en attente), chacun garde son message/historique.
+ETAT : TERMINE.

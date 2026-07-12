@@ -18,6 +18,11 @@ input_history.txt
 # Images generees par /create-image (sorties locales).
 generated_images/
 
+# Tout ce que BAZIZ.IA CREE pour l'utilisateur (projets, jeux, sites...) vit
+# ici et ne part JAMAIS sur GitHub : c'est le bac a sable, pas le logiciel.
+# (Le prompt systeme dit a l'agent de creer ses projets dans ce dossier.)
+outputs/
+
 # Python
 __pycache__/
 *.py[cod]

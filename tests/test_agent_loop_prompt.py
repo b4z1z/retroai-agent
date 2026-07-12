@@ -36,6 +36,15 @@ def test_systeme_contient_la_description_plateforme():
     assert agent_loop._description_plateforme() in agent_loop.SYSTEME
 
 
+def test_systeme_impose_le_dossier_outputs():
+    """Les projets crees par l'agent vont dans outputs/ (gitignore), jamais a
+    la racine du repo — fin du bazar aether-observatory/taskflow/snake_game
+    melange au code du logiciel."""
+    s = agent_loop.SYSTEME
+    assert "outputs/" in s
+    assert "Never create new projects at the repository root" in s
+
+
 def test_systeme_impose_la_persistance_multi_etapes():
     """Regression : l'agent annoncait un plan en N etapes puis s'arretait apres
     l'etape 1. Le prompt doit explicitement lui dire de NE PAS rendre la main
