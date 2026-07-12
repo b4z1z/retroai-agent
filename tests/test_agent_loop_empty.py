@@ -60,6 +60,35 @@ def test_reessaie_apres_tours_vides_puis_reussit(tmp_path, monkeypatch):
     assert agent.client.appels == 3
 
 
+def _tour_outil() -> dict:
+    """Reponse valide qui demande un outil (peu importe lequel)."""
+    return {"choices": [{"message": {
+        "role": "assistant", "content": "",
+        "tool_calls": [{"id": "t1", "type": "function",
+                        "function": {"name": "outil_inconnu_test",
+                                     "arguments": "{}"}}]},
+        "finish_reason": "tool_calls"}]}
+
+
+def test_vides_eparpilles_ne_font_pas_abandonner(tmp_path, monkeypatch):
+    """BUG REEL (transcript utilisateur 2026-07-12) : vide -> lecture OK ->
+    vide -> vide -> lecture OK -> ABANDON, alors que le tour PROGRESSAIT.
+    Le compteur doit se remettre a zero apres chaque reponse valide : seuls
+    les vides CONSECUTIFS comptent."""
+    monkeypatch.chdir(tmp_path)
+    agent = _agent([
+        _vide(),          # 1 vide
+        _tour_outil(),    # reponse valide -> compteur remis a 0
+        _vide(), _vide(), _vide(),   # 3 vides (= MAX, tolere)
+        _tour_outil(),    # valide -> remis a 0
+        _vide(),          # 1 vide
+        _final("Fini."),
+    ])
+
+    assert agent.envoyer("range les plugins") == "Fini."
+    assert agent.client.appels == 8  # tout a ete rejoue, aucun abandon
+
+
 def test_abandonne_avec_message_clair_si_toujours_vide(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Plus de tours vides que la limite -> message d'aide explicite.

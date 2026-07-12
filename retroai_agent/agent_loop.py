@@ -558,6 +558,14 @@ class AgentLoop:
             tool_calls = message.get("tool_calls")
             finish = reponse["choices"][0].get("finish_reason")
 
+            # Reponse VALIDE (outil demande OU contenu present) -> compteur
+            # de vides remis a ZERO. BUG REEL corrige : sans ce reset, des
+            # vides EPARPILLES dans un long tour (vide, 5 outils OK, vide,
+            # vide...) finissaient par depasser la limite et faire abandonner
+            # un tour qui PROGRESSAIT ("consecutifs" doit le rester).
+            if tool_calls or (message.get("content") or "").strip():
+                vides_consecutifs = 0
+
             # --- Cas 1 : pas d'outil demande -> reponse finale -----------
             if not tool_calls:
                 contenu = message.get("content") or ""
