@@ -47,3 +47,6 @@ env/
 
 # Journal local (optionnel : retirez cette ligne pour le versionner)
 # JOURNAL.txt
+
+# Config locale d'outillage (previews...)
+.claude/
