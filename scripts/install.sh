@@ -69,6 +69,11 @@ pipx install --force .
 
 echo ""
 echo "==> Termine !"
-echo "    1) Ouvrez un NOUVEAU terminal (pour recharger le PATH de pipx)"
-echo "    2) Lancez depuis ce dossier :  cd $(pwd) && baziz.ia"
+echo ""
+echo "    Pour lancer MAINTENANT, dans CETTE fenetre :"
+echo "        export PATH=\"\$PATH:\$HOME/.local/bin\" && cd $(pwd) && baziz.ia"
+echo ""
+echo "    (Ou plus simple : ouvrez un NOUVEAU terminal, puis :"
+echo "        cd $(pwd) && baziz.ia )"
+echo ""
 echo "    Pas de cle API ? L'assistant integre vous guide au 1er lancement."

@@ -85,28 +85,47 @@ Avant d'installer, il te faut quelques outils de base. **Vérifie** chacun avec
 
 ## Installation
 
-### ⚡ Installation rapide (une ligne)
+### ⚡ Installation rapide — recommandée (une seule commande)
 
-**Linux / macOS** (dans un terminal) :
+C'est la méthode à utiliser dans 99 % des cas : **copiez, collez, Entrée** —
+le script s'occupe de tout (téléchargement, dépendances, commande `baziz.ia`,
+PATH).
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.sh | sh
-```
-
-**Windows** (dans PowerShell) :
+**🪟 Windows** — ouvrez *PowerShell* et collez :
 
 ```powershell
 irm https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.ps1 | iex
 ```
 
-Le script clone le dépôt, installe les dépendances, crée la commande `baziz.ia`
-et règle le PATH. **Aucune configuration à faire** : au premier lancement,
-l'assistant intégré vous guide pour obtenir la clé API (gratuite) et
-l'enregistre pour vous — voir [La clé API](#-la-clé-api-gratuite) ci-dessous.
+**🐧 Linux / 🍎 macOS** — ouvrez un *terminal* et collez :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.sh | sh
+```
+
+#### ✅ Et ensuite ? Lancer BAZIZ.IA
+
+| Système | Que faire après l'installation |
+|---|---|
+| 🪟 **Windows** | **Rien !** Tapez `baziz.ia` dans la **même fenêtre** — le script a déjà réglé le PATH, y compris pour la session en cours. |
+| 🐧🍎 **Linux / macOS** | Ouvrez un **nouveau terminal** (ou tapez `source ~/.bashrc`), puis : `cd retroai-agent && baziz.ia` |
+
+Au premier lancement, **l'assistant intégré vous guide pour la clé API
+(gratuite)** : navigateur ouvert sur build.nvidia.com, clé collée dans le
+terminal, enregistrée pour vous — **zéro fichier à éditer**. Détails :
+[La clé API](#-la-clé-api-gratuite).
+
+> 💡 **`baziz.ia` n'est pas reconnu ?** Deux dépannages express :
+> 1. Fermez et rouvrez le terminal (le PATH se recharge), puis réessayez.
+> 2. Toujours rien ? Cette commande marche **toujours**, PATH ou pas :
+>    ```bash
+>    cd retroai-agent
+>    python -m retroai_agent.main
+>    ```
 
 ---
 
-### 🛠️ Installation manuelle
+### 🛠️ Installation manuelle (avancé — si vous préférez tout contrôler)
 
 <details>
 <summary><b>Linux / macOS</b></summary>
