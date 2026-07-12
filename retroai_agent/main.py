@@ -486,7 +486,7 @@ def _menu_plugins() -> None:
         deja = {p["nom"] for p in plugins.liste()}
         options = [
             (i, f"{e['nom']:<16} — {e.get('description', '')[:48]}"
-                f"{'  ⚠' if e.get('dangereux') else ''}"
+                f"{'  🔐' if e.get('dangereux') else ''}"
                 f"{'  (installed)' if e['nom'] in deja else ''}")
             for i, e in enumerate(entrees)
         ]
@@ -495,6 +495,17 @@ def _menu_plugins() -> None:
         if idx is None:
             return
         entree = entrees[idx]
+        # ACCES ETENDU (fichiers, systeme, donnees sensibles...) : on previent
+        # AVANT le telechargement pour que l'utilisateur prenne ses
+        # precautions — c'est la qu'un avertissement est utile, pas un badge
+        # anxiogene sur chaque carte.
+        if entree.get("dangereux"):
+            ui.info(
+                "🔐 Heads-up: this plugin has BROAD ACCESS (files, system or "
+                "sensitive data). Review its code first (marketplace → 'Voir "
+                "le code'). Once installed, it will still ask a y/n "
+                "confirmation before EACH run."
+            )
         # Telecharger du CODE que l'agent pourra executer merite une
         # confirmation explicite, avec la source affichee.
         try:

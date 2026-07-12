@@ -28,7 +28,9 @@
   .carte h3 { color:var(--accent); font-size:1.05rem; word-break:break-all; }
   .carte p { color:var(--texte); font-size:.9rem; line-height:1.55; flex:1; }
   .meta { color:var(--dim); font-size:.78rem; display:flex; justify-content:space-between; }
-  .danger { color:#ffb224; font-size:.78rem; }
+  .acces { display:inline-block; color:#ffb224; font-size:.72rem;
+           border:1px solid #4a3a12; background:#241d0a; border-radius:999px;
+           padding:2px 10px; margin-left:6px; vertical-align:middle; }
   .actions { display:flex; gap:8px; margin-top:6px; }
   .btn { flex:1; text-align:center; padding:8px 10px; border-radius:7px; font-size:.82rem;
          cursor:pointer; border:1px solid #33333a; background:#202026; color:var(--texte);
@@ -63,7 +65,10 @@
   <footer>
     Propulsé par <a href="https://github.com/b4z1z/retroai-agent">RetroAI Agent (BAZIZ.IA)</a>
     — l'agent IA de terminal <b>100 % gratuit</b> (NVIDIA NIM).<br>
-    Un plugin marqué ⚠ demande une confirmation avant chaque exécution.
+    🔐 <b>accès étendu</b> = le plugin touche à vos fichiers, votre système ou
+    des données sensibles : il demande une <b>confirmation à chaque
+    exécution</b>, et un avertissement s'affiche avant l'installation.
+    Vérifiez son code (« Voir le code ») avant d'installer.
   </footer>
 </div>
 
@@ -82,7 +87,8 @@
         var carte = document.createElement("div");
         carte.className = "carte";
         carte.innerHTML =
-          "<h3>" + p.nom + (p.dangereux ? " <span class='danger'>⚠</span>" : "") + "</h3>" +
+          "<h3>" + p.nom + (p.dangereux ?
+            " <span class='acces'>🔐 accès étendu</span>" : "") + "</h3>" +
           "<p>" + p.description + "</p>" +
           "<div class='meta'><span>par " + (p.auteur || "?") + "</span><span>" +
           p.fichier + "</span></div>" +

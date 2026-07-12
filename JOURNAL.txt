@@ -2596,3 +2596,19 @@ TESTS : test_plugins_gestion.py (8 : off/on a chaud, suppression, install
 valide/invalide/reseau, catalogue parse+filtre+hors-ligne, coherence du
 registry livre avec les fichiers). 188 -> 196, tous OK. Boot propre verifie.
 ETAT : TERMINE. (Reste : deployer sur Vercel — action utilisateur.)
+
+SUITE (retour utilisateur : "le DANGEREUX fait peur") : reetiquetage complet.
+Le flag technique DANGEREUX du contrat ne change PAS (c'est lui qui declenche
+la confirmation y/n) ; seule la PRESENTATION change :
+- Site vitrine : badge rouge "⚠ DANGEREUX" -> pastille ambre discrete
+  "🔐 acces etendu" ; pied de page explique calmement (confirmation a chaque
+  execution + avertissement avant installation + "verifiez le code").
+- App, /plugins > voir : "⚠ confirm" (rouge DANGER) -> "🔐 confirm" (gris).
+- App, /plugins > installer : le VRAI avertissement arrive AU MOMENT DU
+  TELECHARGEMENT (la ou il est utile) : "Heads-up: this plugin has BROAD
+  ACCESS (files, system or sensitive data). Review its code first... will
+  still ask a y/n confirmation before EACH run." puis la question y/n.
+Philosophie : badge informatif sur les cartes, avertissement serieux au
+moment d'agir — pas d'anxiete permanente. 196 tests OK.
+(NB : la page du screenshot utilisateur etait une page generee par BAZIZ.IA
+lui-meme dans son espace — la notre est marketplace/index.html.)

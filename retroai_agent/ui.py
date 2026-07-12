@@ -865,7 +865,9 @@ def afficher_plugins(liste: list, problemes: list) -> None:
             t.append(f"{p['description'][:52]:<54}", style="default")
             t.append(p["fichier"], style=DIM)
             if p["dangereux"]:
-                t.append("  ⚠ confirm", style=f"bold {DANGER}")
+                # Libelle informatif, pas anxiogene : ca dit juste que
+                # l'outil demandera un y/n avant chaque execution.
+                t.append("  🔐 confirm", style=DIM)
         if problemes:
             t.append(f"\n\nIgnored ({len(problemes)}):\n", style=f"bold {DANGER}")
             for probleme in problemes:
@@ -875,8 +877,8 @@ def afficher_plugins(liste: list, problemes: list) -> None:
     else:
         print(f"\n[plugins] {len(liste)} loaded")
         for p in liste:
-            danger = "  [confirm]" if p["dangereux"] else ""
-            print(f"  {p['nom']} - {p['description']} ({p['fichier']}){danger}")
+            acces = "  [asks confirmation]" if p["dangereux"] else ""
+            print(f"  {p['nom']} - {p['description']} ({p['fichier']}){acces}")
         for probleme in problemes:
             print(f"  ignored: {probleme}")
 
