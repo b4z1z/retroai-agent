@@ -2612,3 +2612,20 @@ Philosophie : badge informatif sur les cartes, avertissement serieux au
 moment d'agir — pas d'anxiete permanente. 196 tests OK.
 (NB : la page du screenshot utilisateur etait une page generee par BAZIZ.IA
 lui-meme dans son espace — la notre est marketplace/index.html.)
+
+----------------------------------------------------------------
+[2026-07-13] FIX compteur de tours vides (bug revele par transcript reel)
+----------------------------------------------------------------
+Transcript utilisateur : 'mets ces plugins dans le dossier plugins' -> l'agent
+lit les fichiers un a un, des tours vides s'intercalent (vide 1/3, lecture OK,
+vide 2/3, vide 3/3, lecture OK, ABANDON 'model overloaded') alors que le tour
+PROGRESSAIT entre les vides. CAUSE : vides_consecutifs n'etait JAMAIS remis a
+zero apres une reponse valide -> il comptait les vides CUMULES du tour, pas
+les consecutifs. FIX (_dialoguer) : reset a 0 des qu'une reponse valide
+arrive (tool_calls OU contenu non vide). TEST : sequence vide/outil/3 vides/
+outil/vide/final -> aboutit sans abandon (8 appels rejoues). 196 -> 197.
+MARKETPLACE 'vide' rapporte par l'utilisateur : verifie en reel — le registre
+GitHub repond avec les 4 plugins (l'app n'a AUCUN probleme). Explications :
+instance BAZIZ.IA ouverte avec l'ancien code (-> /restart) OU le site Vercel
+pas encore deploye (action utilisateur, guide marketplace/README.md).
+ETAT : TERMINE, pushe (bf4822a).
