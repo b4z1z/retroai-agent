@@ -2554,3 +2554,45 @@ ETAT : TERMINE ET VALIDE EN REEL. (/restart puis 'quel temps a Fes ?')
 AJUSTEMENT (retour utilisateur) : boot SILENCIEUX — le message "🔌 N
 plugin(s) loaded" au demarrage est retire (inutile a chaque lancement) ;
 seuls les plugins CASSES restent signales. /plugins pour voir la liste.
+
+----------------------------------------------------------------
+[2026-07-12] MARKETPLACE COMMUNAUTAIRE de plugins + /plugins devient un HUB
+----------------------------------------------------------------
+Idee utilisateur : un marche/communaute pour que les utilisateurs partagent
+leurs plugins (site Vercel) + /plugins devient un menu de gestion complet.
+ARCHITECTURE — une seule source de verite : marketplace/registry.json sur le
+depot GitHub. L'app le lit via raw.githubusercontent.com (installer), le
+site vitrine (marketplace/index.html, statique, pret pour Vercel) lit le
+MEME fichier. Les .py communautaires vivent dans marketplace/plugins/.
+1) plugins.py etendu : lister_desactives / desactiver_fichier /
+   reactiver_fichier (renommage *.py.off — etat visible, zero config) /
+   supprimer_fichier / catalogue(url) / installer(entree) qui TELECHARGE
+   puis VALIDE le contrat AVANT de garder (un plugin invalide est supprime
+   immediatement). URL_REGISTRE/URL_SITE surchargables par env.
+2) /plugins = HUB a fleches (main._menu_plugins + _choisir avec repli
+   numerote) : voir / installer depuis le marketplace / desactiver /
+   reactiver / supprimer. TOUT A CHAUD : chaque action re-appelle
+   plugins.activer() -> le schema modele est re-fusionne, AUCUN /restart.
+   Ouvrir /plugins fait aussi un rescan (un fichier ecrit par l'agent est
+   pris en compte instantanement). Confirmations : y/n avant TELECHARGER du
+   code (source affichee) et avant SUPPRIMER.
+3) SITE VITRINE marketplace/index.html : statique autonome (theme sombre
+   accent #E03131 assorti a l'app), lit registry.json, cartes (nom, desc,
+   auteur, ⚠ dangereux, Voir le code / Copier l'URL), how-to. VERIFIE en
+   local via http.server (rendu nickel, 4 plugins affiches).
+   marketplace/README.md : deploiement Vercel en 5 etapes (Root Directory =
+   marketplace, preset Other) + alternative GitHub Pages + procedure PR pour
+   publier un plugin communautaire.
+4) CATALOGUE initial (4) : get_weather, calculate (copies des exemples) +
+   NOUVEAUX current_datetime (horloge.py) et system_info (stdlib pure) —
+   il y a donc des plugins A INSTALLER pour la demo.
+5) SYSTEME + AIDE_LOGICIEL + COMMANDES a jour (hub, marketplace, rechargement
+   instantane ; l'agent recommande /plugins ou /restart apres avoir cree un
+   plugin). README principal : puce Plugins + marche communautaire.
+NOTE Vercel : le deploiement lui-meme = 2 min sur vercel.com (compte
+utilisateur requis), guide fourni ; l'URL par defaut baziz-plugins.vercel.app
+est a ajuster dans plugins.URL_SITE si differente.
+TESTS : test_plugins_gestion.py (8 : off/on a chaud, suppression, install
+valide/invalide/reseau, catalogue parse+filtre+hors-ligne, coherence du
+registry livre avec les fichiers). 188 -> 196, tous OK. Boot propre verifie.
+ETAT : TERMINE. (Reste : deployer sur Vercel — action utilisateur.)

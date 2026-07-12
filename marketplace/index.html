@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAZIZ.IA — Plugin Marketplace</title>
+<meta name="description" content="Le marché communautaire de plugins pour BAZIZ.IA, l'agent IA de terminal gratuit.">
+<style>
+  :root { --accent:#E03131; --bg:#0d0d0f; --carte:#17171b; --dim:#8b8b93; --texte:#ececf1; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--texte);
+         font-family:ui-monospace,'Cascadia Code',Consolas,monospace; min-height:100vh; }
+  .conteneur { max-width:960px; margin:0 auto; padding:48px 20px; }
+  header { text-align:center; margin-bottom:40px; }
+  .logo { color:var(--accent); font-weight:bold; font-size:2rem; letter-spacing:2px; }
+  .sous-titre { color:var(--dim); margin-top:8px; }
+  .badge-compteur { display:inline-block; margin-top:14px; padding:4px 14px;
+    border:1px solid var(--accent); border-radius:999px; color:var(--accent); font-size:.9rem; }
+  .howto { background:var(--carte); border:1px solid #26262c; border-radius:10px;
+           padding:18px 22px; margin-bottom:32px; line-height:1.7; }
+  .howto b { color:var(--accent); }
+  code { background:#222228; padding:2px 8px; border-radius:5px; font-size:.92em; }
+  .grille { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; }
+  .carte { background:var(--carte); border:1px solid #26262c; border-radius:10px;
+           padding:20px; display:flex; flex-direction:column; gap:10px;
+           transition:border-color .15s; }
+  .carte:hover { border-color:var(--accent); }
+  .carte h3 { color:var(--accent); font-size:1.05rem; word-break:break-all; }
+  .carte p { color:var(--texte); font-size:.9rem; line-height:1.55; flex:1; }
+  .meta { color:var(--dim); font-size:.78rem; display:flex; justify-content:space-between; }
+  .danger { color:#ffb224; font-size:.78rem; }
+  .actions { display:flex; gap:8px; margin-top:6px; }
+  .btn { flex:1; text-align:center; padding:8px 10px; border-radius:7px; font-size:.82rem;
+         cursor:pointer; border:1px solid #33333a; background:#202026; color:var(--texte);
+         text-decoration:none; }
+  .btn:hover { border-color:var(--accent); }
+  .btn-accent { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:bold; }
+  footer { text-align:center; color:var(--dim); margin-top:48px; font-size:.85rem; line-height:1.8; }
+  footer a { color:var(--accent); text-decoration:none; }
+  #etat { text-align:center; color:var(--dim); padding:30px; }
+</style>
+</head>
+<body>
+<div class="conteneur">
+  <header>
+    <div class="logo">BAZIZ.IA</div>
+    <div class="sous-titre">🔌 Plugin Marketplace — étendez votre agent, gratuitement</div>
+    <div class="badge-compteur" id="compteur">…</div>
+  </header>
+
+  <div class="howto">
+    <b>Installer un plugin (dans BAZIZ.IA) :</b> tapez <code>/plugins</code>
+    → <code>🛒 Install from the community marketplace</code> → choisissez →
+    il est <b>actif immédiatement</b>, sans redémarrage.<br>
+    <b>Publier le vôtre :</b> un plugin = un fichier Python de ~30 lignes
+    (<code>OUTIL</code> + <code>executer()</code>). Proposez-le via une pull
+    request sur le dépôt GitHub — il apparaîtra ici.
+  </div>
+
+  <div id="etat">Chargement du catalogue…</div>
+  <div class="grille" id="grille"></div>
+
+  <footer>
+    Propulsé par <a href="https://github.com/b4z1z/retroai-agent">RetroAI Agent (BAZIZ.IA)</a>
+    — l'agent IA de terminal <b>100 % gratuit</b> (NVIDIA NIM).<br>
+    Un plugin marqué ⚠ demande une confirmation avant chaque exécution.
+  </footer>
+</div>
+
+<script>
+  // Le catalogue est le MEME registry.json que lit l'application : une seule
+  // source de verite (le depot GitHub), le site n'est que la vitrine.
+  fetch("registry.json")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var plugins = data.plugins || [];
+      document.getElementById("etat").style.display = "none";
+      document.getElementById("compteur").textContent =
+        plugins.length + " plugin" + (plugins.length > 1 ? "s" : "") + " disponibles";
+      var grille = document.getElementById("grille");
+      plugins.forEach(function (p) {
+        var carte = document.createElement("div");
+        carte.className = "carte";
+        carte.innerHTML =
+          "<h3>" + p.nom + (p.dangereux ? " <span class='danger'>⚠</span>" : "") + "</h3>" +
+          "<p>" + p.description + "</p>" +
+          "<div class='meta'><span>par " + (p.auteur || "?") + "</span><span>" +
+          p.fichier + "</span></div>" +
+          "<div class='actions'>" +
+          "<a class='btn' href='" + p.url + "' target='_blank'>Voir le code</a>" +
+          "<span class='btn btn-accent' onclick='copier(this, \"" + p.url + "\")'>Copier l’URL</span>" +
+          "</div>";
+        grille.appendChild(carte);
+      });
+    })
+    .catch(function () {
+      document.getElementById("etat").textContent =
+        "Impossible de charger le catalogue. Réessayez plus tard.";
+    });
+
+  function copier(bouton, url) {
+    navigator.clipboard.writeText(url).then(function () {
+      var avant = bouton.textContent;
+      bouton.textContent = "Copié ✓";
+      setTimeout(function () { bouton.textContent = avant; }, 1500);
+    });
+  }
+</script>
+</body>
+</html>

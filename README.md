@@ -42,6 +42,12 @@ l'utilisateur**.
 - 🔌 Appels à l'API NVIDIA NIM avec **retry + backoff exponentiel** sur les 429.
 - 🧠 Mode *thinking* (raisonnement) activable/désactivable via la config.
 - 🛠️ **4 outils** : `read_file`, `write_file`, `list_directory`, `run_shell_command`.
+- 🔌 **Plugins** : ajoutez des outils en déposant un fichier `.py` dans
+  `plugins/` (~30 lignes, voir [plugins/README.md](plugins/README.md)) — ou
+  installez-en depuis le **[marché communautaire](marketplace/README.md)**
+  via le menu `/plugins` (installer / désactiver / supprimer, **à chaud**,
+  sans redémarrage). L'agent peut même **écrire ses propres plugins** :
+  demandez-lui « crée-toi un plugin météo ».
 - 🔒 **Sécurisé par défaut** : confirmation interactive obligatoire pour toute
   écriture de fichier ou commande shell ; avertissement renforcé sur les
   commandes dangereuses ; aucun mode « toujours accepter ».

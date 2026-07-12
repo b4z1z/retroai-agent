@@ -14,6 +14,7 @@ Lancement :
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 import sys
@@ -150,7 +151,7 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             _menu_modele(agent)
             continue
         if saisie == "/plugins":
-            ui.afficher_plugins(plugins.liste(), plugins.erreurs())
+            _menu_plugins()
             continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :
@@ -419,6 +420,160 @@ def _menu_image(agent: AgentLoop) -> None:
         return
 
     ui.erreur(f"Unknown choice: {choix}")
+
+
+def _choisir(titre: str, texte: str, options: list) -> str | None:
+    """
+    Choix a fleches (ui.selecteur) avec REPLI numerote automatique quand le
+    selecteur est indisponible. options = [(valeur, libelle)]. None = annule.
+    """
+    choix = ui.selecteur(titre, texte, options)
+    if choix is not None:
+        return choix
+    ui.info(texte)
+    for i, (_, libelle) in enumerate(options, start=1):
+        ui.info(f"  {i}. {libelle}")
+    try:
+        reponse = ui.demander_texte(
+            f"Choice? (1-{len(options)}, Enter to cancel):"
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if reponse.isdigit() and 1 <= int(reponse) <= len(options):
+        return options[int(reponse) - 1][0]
+    return None
+
+
+def _menu_plugins() -> None:
+    """
+    Commande /plugins : hub de gestion des plugins. Voir / installer depuis
+    le marketplace communautaire / desactiver / reactiver / supprimer.
+    TOUT est applique A CHAUD (plugins.activer() re-fusionne le schema) :
+    aucun /restart necessaire.
+    """
+    plugins.activer()  # rescan : un fichier ajoute a la main est vu direct
+    actifs = plugins.liste()
+    inactifs = plugins.lister_desactives()
+
+    action = _choisir(
+        "Plugins",
+        f"{len(actifs)} active, {len(inactifs)} disabled — community "
+        f"marketplace: {plugins.URL_SITE}",
+        [
+            ("voir", f"📋 See installed plugins ({len(actifs)})"),
+            ("installer", "🛒 Install from the community marketplace"),
+            ("desactiver", f"⏸  Disable a plugin ({len(actifs)} active)"),
+            ("reactiver", f"▶  Enable a disabled plugin ({len(inactifs)} off)"),
+            ("supprimer", "🗑  Delete a plugin file"),
+        ],
+    )
+    if action is None:
+        return
+
+    if action == "voir":
+        ui.afficher_plugins(plugins.liste(), plugins.erreurs())
+        return
+
+    if action == "installer":
+        ui.info("Fetching the community catalog…")
+        entrees, probleme = plugins.catalogue()
+        if probleme:
+            ui.erreur(probleme)
+            return
+        if not entrees:
+            ui.info("The marketplace is empty for now.")
+            return
+        deja = {p["nom"] for p in plugins.liste()}
+        options = [
+            (i, f"{e['nom']:<16} — {e.get('description', '')[:48]}"
+                f"{'  ⚠' if e.get('dangereux') else ''}"
+                f"{'  (installed)' if e['nom'] in deja else ''}")
+            for i, e in enumerate(entrees)
+        ]
+        idx = _choisir("Marketplace",
+                       "Pick a plugin to install (Esc to cancel):", options)
+        if idx is None:
+            return
+        entree = entrees[idx]
+        # Telecharger du CODE que l'agent pourra executer merite une
+        # confirmation explicite, avec la source affichee.
+        try:
+            ok = ui.demander_texte(
+                f"Install '{entree['nom']}' from {entree['url']} ? (y/n):"
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if ok not in ("y", "yes", "o", "oui"):
+            ui.info("Cancelled.")
+            return
+        probleme = plugins.installer(entree)
+        if probleme:
+            ui.erreur(probleme)
+            return
+        plugins.activer()
+        ui.succes(f"Plugin '{entree['nom']}' installed and ACTIVE right now "
+                  "(no restart needed).")
+        return
+
+    if action == "desactiver":
+        if not actifs:
+            ui.info("No active plugin.")
+            return
+        fichier = _choisir("Disable", "Pick a plugin to disable:",
+                           [(p["fichier"], f"{p['nom']} — {p['fichier']}")
+                            for p in actifs])
+        if fichier is None:
+            return
+        probleme = plugins.desactiver_fichier(fichier)
+        if probleme:
+            ui.erreur(probleme)
+            return
+        plugins.activer()
+        ui.succes("Disabled (kept on disk — re-enable anytime via /plugins).")
+        return
+
+    if action == "reactiver":
+        if not inactifs:
+            ui.info("No disabled plugin.")
+            return
+        fichier = _choisir("Enable", "Pick a plugin to re-enable:",
+                           [(f, os.path.basename(f)) for f in inactifs])
+        if fichier is None:
+            return
+        probleme = plugins.reactiver_fichier(fichier)
+        if probleme:
+            ui.erreur(probleme)
+            return
+        plugins.activer()
+        ui.succes("Enabled and ACTIVE right now (no restart needed).")
+        return
+
+    if action == "supprimer":
+        tout = [(p["fichier"], f"{p['nom']} — {p['fichier']}") for p in actifs]
+        tout += [(f, f"(disabled) {os.path.basename(f)}") for f in inactifs]
+        if not tout:
+            ui.info("Nothing to delete.")
+            return
+        fichier = _choisir("Delete", "Pick a plugin file to DELETE forever:",
+                           tout)
+        if fichier is None:
+            return
+        try:
+            ok = ui.demander_texte(
+                f"Really delete {fichier}? This cannot be undone (y/n):"
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if ok not in ("y", "yes", "o", "oui"):
+            ui.info("Cancelled.")
+            return
+        probleme = plugins.supprimer_fichier(fichier)
+        if probleme:
+            ui.erreur(probleme)
+            return
+        plugins.activer()
+        ui.succes("Deleted.")
+        return
 
 
 # Modeles de CHAT proposes dans le menu /model : (id NVIDIA, description).
