@@ -943,6 +943,7 @@ def reflexion(message: str = "Thinking…"):
 COMMANDES = [
     ("/help", "Show this help"),
     ("/tuto", "Replay the interactive getting-started tour"),
+    ("/model", "Pick the CHAT model (applied instantly, kept until changed)"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),

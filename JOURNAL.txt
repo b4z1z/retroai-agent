@@ -2463,3 +2463,26 @@ depart — mais les 3 bugs decouverts en chemin etaient reels et sont corriges.)
    la limite Unix ; sous Windows install.ps1 (irm|iex) tourne DANS la session
    donc la, c'est automatique. Syntaxe sh -n validee.
 ETAT : TERMINE, pushe (f0be52e).
+
+----------------------------------------------------------------
+[2026-07-12] FEATURE /model : gestion du modele de chat in-app
+----------------------------------------------------------------
+Demande : gerer le modele avec un MODELE DE BASE (nemotron, le defaut actuel)
+qui reste tant que l'utilisateur ne le change pas.
+IMPLEMENTATION (main._menu_modele, calquee sur /image) :
+- Menu a fleches (ui.selecteur / radiolist) : modele courant affiche +
+  MODELES_CHAT verifies en reel (nemotron = base, deepseek-v4-flash,
+  llama-3.3-70b) + entree "Custom…" (n'importe quel id du catalogue).
+- Repli numerote (1-4) si prompt_toolkit/TTY indisponible, comme /image.
+- POINT CLE D'ARCHI : config.model est relu A CHAQUE appel API
+  (_construire_payload) et agent.config est le MEME objet -> changement
+  applique A CHAUD, le message suivant part deja sur le nouveau modele,
+  AUCUN /restart necessaire.
+- PERSISTANCE : set_env_value("NVIDIA_MODEL", ...) -> .env + os.environ ->
+  le choix survit aux relances, jusqu'au prochain /model.
+- Annuler (Esc/Enter/vide) ou re-choisir le modele courant = AUCUNE ecriture.
+- Declare dans ui.COMMANDES (menu "/") et AIDE_LOGICIEL (l'agent-manuel).
+TESTS : test_main_model.py (6 : a-chaud+persiste, annulation, modele courant
+sans reecriture, custom, repli numerote, base en tete de liste + presence
+menu). 171 -> 177, tous OK.
+ETAT : TERMINE. (/restart pour charger la commande, puis /model.)

@@ -143,6 +143,9 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         if saisie == "/image":
             _menu_image(agent)
             continue
+        if saisie == "/model":
+            _menu_modele(agent)
+            continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :
             #   /create-image un chat astronaute   -> genere directement
@@ -410,6 +413,88 @@ def _menu_image(agent: AgentLoop) -> None:
         return
 
     ui.erreur(f"Unknown choice: {choix}")
+
+
+# Modeles de CHAT proposes dans le menu /model : (id NVIDIA, description).
+# Le 1er est le MODELE DE BASE (defaut de l'app). Tous verifies en reel avec
+# tool-calling. "custom" permet d'entrer n'importe quel id du catalogue.
+MODELES_CHAT = [
+    ("nvidia/nemotron-3-ultra-550b-a55b",
+     "default — reasoning + tools, fast (NVIDIA's own, best served)"),
+    ("deepseek-ai/deepseek-v4-flash",
+     "reasoning, strong at code (can be busy at peak times)"),
+    ("meta/llama-3.3-70b-instruct",
+     "no reasoning — steady, quick, simple tasks"),
+]
+
+
+def _menu_modele(agent: AgentLoop) -> None:
+    """
+    Commande /model : gestion du modele de CHAT. Affiche le modele courant,
+    propose les modeles verifies (+ saisie libre), applique A CHAUD (le
+    prochain message part deja sur le nouveau modele — config.model est relu
+    a chaque appel API) et PERSISTE dans .env : le choix reste jusqu'a ce que
+    l'utilisateur le rechange. Annuler ne change rien.
+    """
+    config = agent.config
+    options = [(mid, f"{mid} — {desc}") for mid, desc in MODELES_CHAT]
+    options.append(("__custom__", "Custom… (any model id from build.nvidia.com/models)"))
+
+    choix = ui.selecteur(
+        "Chat model",
+        f"Current model: {config.model}\n"
+        "The choice is applied immediately and kept until you change it.",
+        options,
+        defaut=config.model if any(config.model == m for m, _ in options) else None,
+    )
+    if choix is None:
+        # Selecteur indisponible (pas de prompt_toolkit / pas de TTY) ou Esc :
+        # repli en saisie numerotee, comme /image.
+        ui.info(f"Current model: {config.model}")
+        for i, (mid, desc) in enumerate(MODELES_CHAT, start=1):
+            ui.info(f"  {i}. {mid} — {desc}")
+        ui.info(f"  {len(MODELES_CHAT) + 1}. Custom (type a model id)")
+        try:
+            reponse = ui.demander_texte(
+                f"Change model? (1-{len(MODELES_CHAT) + 1}, Enter to keep):"
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            ui.info("\nCancelled.")
+            return
+        if not reponse:
+            return
+        if reponse.isdigit() and 1 <= int(reponse) <= len(MODELES_CHAT):
+            choix = MODELES_CHAT[int(reponse) - 1][0]
+        elif reponse == str(len(MODELES_CHAT) + 1):
+            choix = "__custom__"
+        else:
+            ui.erreur(f"Unknown choice: {reponse}")
+            return
+
+    if choix == "__custom__":
+        try:
+            choix = ui.demander_texte(
+                "Model id (e.g. qwen/… — see build.nvidia.com/models):"
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            ui.info("\nCancelled.")
+            return
+        if not choix:
+            ui.info("Cancelled (empty).")
+            return
+
+    if choix == config.model:
+        ui.info(f"Already using {config.model} — nothing changed.")
+        return
+
+    # Application A CHAUD + persistance : le choix survit aux relances et
+    # reste le modele courant jusqu'au prochain /model.
+    config.model = choix
+    set_env_value("NVIDIA_MODEL", choix)
+    ui.succes(
+        f"Chat model switched to {choix} — applies from your NEXT message "
+        "(saved to .env, no restart needed)."
+    )
 
 
 def _creer_image(agent: AgentLoop, description: str = "") -> None:
