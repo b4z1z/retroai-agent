@@ -2436,3 +2436,30 @@ FIX install.ps1 : (a) ajoute AUSSI le dossier au $env:Path de la SESSION EN
 COURS -> baziz.ia marche immediatement, sans rouvrir ; (b) VERIFICATION
 FINALE explicite : vert "la commande baziz.ia est PRETE" si Get-Command la
 voit, sinon jaune avec le repli python -m retroai_agent.main. Syntaxe validee.
+(Resolution du mystere : l'ami n'avait simplement PAS lance le one-liner au
+depart — mais les 3 bugs decouverts en chemin etaient reels et sont corriges.)
+
+----------------------------------------------------------------
+[2026-07-12] README : installation HYPER user-friendly + trailers retires
+----------------------------------------------------------------
+1) COMMITS : retrait du trailer Co-Authored-By de TOUS les commits (9),
+   demande utilisateur apres avoir vu "claude" dans Contributors GitHub.
+   filter-branch --msg-filter + push --force (c033df1 -> cb7f616). Verifie :
+   0 trailer restant, 39/39 commits auteur amekouar. La vignette Contributors
+   de GitHub est un cache asynchrone -> disparait sous quelques heures/jours.
+   PREFERENCE PERMANENTE enregistree en memoire : plus jamais ce trailer.
+2) README, section Installation refondue "priorite au rapide" :
+   - Installation rapide = LA methode ("99% des cas", copiez-collez-Entree),
+     blocs Windows/Linux bien separes avec emojis ;
+   - tableau "Et ensuite ?" par systeme : Windows = RIEN (PATH regle meme
+     pour la session en cours par install.ps1), Linux/macOS = nouveau
+     terminal ou source ~/.bashrc ;
+   - encadre depannage express ("baziz.ia n'est pas reconnu ?") : rouvrir le
+     terminal, sinon python -m retroai_agent.main marche toujours ;
+   - installation manuelle reetiquetee "(avance)".
+3) install.sh : message final donne la commande EXACTE pour lancer SANS
+   rouvrir la fenetre (export PATH=...:$HOME/.local/bin && baziz.ia) — un
+   script pipe (curl|sh) ne PEUT PAS modifier le PATH du shell parent, c'est
+   la limite Unix ; sous Windows install.ps1 (irm|iex) tourne DANS la session
+   donc la, c'est automatique. Syntaxe sh -n validee.
+ETAT : TERMINE, pushe (f0be52e).
