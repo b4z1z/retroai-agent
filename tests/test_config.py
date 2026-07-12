@@ -17,6 +17,17 @@ def test_cle_manquante_leve_systemexit(monkeypatch):
         config.load_config(dotenv_path=_PAS_DE_ENV)
 
 
+def test_cle_placeholder_traitee_comme_absente(monkeypatch):
+    """La cle EXEMPLE de .env.example copiee telle quelle (install.ps1 le
+    faisait) n'est pas une vraie cle : SystemExit -> l'assistant de premiere
+    configuration prend le relais au lieu d'un 401 plus tard."""
+    monkeypatch.setenv(
+        "NVIDIA_API_KEY", "nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    )
+    with pytest.raises(SystemExit):
+        config.load_config(dotenv_path=_PAS_DE_ENV)
+
+
 def test_valeurs_par_defaut(monkeypatch):
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
     for var in ("NVIDIA_MODEL", "NVIDIA_BASE_URL", "SHELL_TIMEOUT",

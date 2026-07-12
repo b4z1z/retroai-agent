@@ -2400,3 +2400,29 @@ ecrite dans .env + os.environ, forme invalide non testee en ligne puis bonne
 cle, rejet 401 x3 -> abandon sans rien ecrire, hors-ligne enregistre quand
 meme, saisie vide annule). 163 -> 170, tous OK.
 ETAT : TERMINE. (Test reel : renommer .env puis lancer baziz.ia.)
+
+----------------------------------------------------------------
+[2026-07-12] FIX INSTALL nouvel utilisateur ("baziz.ia ne marche pas chez lui")
+----------------------------------------------------------------
+Rapport reel : la commande baziz.ia introuvable chez un ami apres l'install
+one-liner Windows. DEUX bugs de parcours nouvel utilisateur :
+1) PATH WINDOWS : install.ps1 fait pip install -e . HORS venv -> pip depose
+   baziz.ia.exe dans un dossier Scripts souvent ABSENT du PATH -> "baziz.ia
+   n'est pas reconnu". FIX : apres l'install, si Get-Command echoue, on
+   localise baziz.ia.exe via sysconfig (scripts + nt_user) et on AJOUTE le
+   dossier au PATH UTILISATEUR persistant ([Environment]::SetEnvironment
+   Variable), avec message "ouvrez un NOUVEAU terminal". Syntaxe validee.
+2) CLE PLACEHOLDER : install.ps1/install.sh copiaient .env.example -> .env
+   avec la fausse cle nvapi-xxxx... -> load_config croyait la cle presente ->
+   l'assistant de 1re configuration ne se declenchait JAMAIS et l'utilisateur
+   recoltait un 401 incomprehensible plus tard. FIX (a) config.load_config
+   traite toute cle commencant par nvapi-xxxx comme ABSENTE (SystemExit ->
+   assistant) ; (b) les 2 installateurs NE COPIENT PLUS .env.example -> .env :
+   c'est l'assistant integre qui cree la config au 1er lancement (messages
+   finaux des scripts mis a jour).
+DEPANNAGE IMMEDIAT (sans reinstaller) : python -m retroai_agent.main depuis
+le dossier retroai-agent marche toujours, PATH ou pas.
+NOTE : le one-liner irm|iex sert la version GITHUB des scripts -> PUSH requis
+pour que les nouveaux utilisateurs en profitent.
+TESTS : test_config.py +1 (placeholder = absente). 170 -> 171, tous OK.
+ETAT : TERMINE (push necessaire).

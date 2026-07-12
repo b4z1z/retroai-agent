@@ -135,6 +135,11 @@ def load_config(dotenv_path: str = ".env") -> Config:
 
     # 2. Valeur OBLIGATOIRE : la cle API.
     api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
+    # La cle "exemple" de .env.example copiee telle quelle n'est PAS une vraie
+    # cle : on la traite comme absente -> l'assistant de premiere
+    # configuration se lance au lieu d'un 401 incomprehensible plus tard.
+    if api_key.lower().startswith("nvapi-xxxx"):
+        api_key = ""
     if not api_key:
         raise SystemExit(
             "Configuration error: NVIDIA_API_KEY is missing.\n"

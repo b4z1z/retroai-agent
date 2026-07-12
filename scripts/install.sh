@@ -62,14 +62,13 @@ echo "==> Installation de la commande 'baziz.ia' via pipx..."
 pipx install --force .
 
 # ------------------------------------------------------------------ #
-# 4. Configuration (.env).                                           #
+# 4. PAS de copie de .env : au premier lancement sans cle, l'ASSISTANT #
+#    integre guide l'utilisateur (etapes NVIDIA, navigateur, saisie de #
+#    la cle dans le terminal, ecriture automatique dans .env).         #
 # ------------------------------------------------------------------ #
-if [ ! -f .env ]; then
-    cp .env.example .env
-fi
 
 echo ""
 echo "==> Termine !"
-echo "    1) Mettez votre cle dans :  $(pwd)/.env   (nano .env)"
-echo "    2) Ouvrez un NOUVEAU terminal (pour recharger le PATH de pipx)"
-echo "    3) Lancez depuis ce dossier :  cd $(pwd) && baziz.ia"
+echo "    1) Ouvrez un NOUVEAU terminal (pour recharger le PATH de pipx)"
+echo "    2) Lancez depuis ce dossier :  cd $(pwd) && baziz.ia"
+echo "    Pas de cle API ? L'assistant integre vous guide au 1er lancement."
