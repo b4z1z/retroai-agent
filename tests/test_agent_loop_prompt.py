@@ -43,6 +43,10 @@ def test_systeme_impose_le_dossier_outputs():
     s = agent_loop.SYSTEME
     assert "outputs/" in s
     assert "Never create new projects at the repository root" in s
+    # Exception cruciale : les PLUGINS que l'agent se cree vont dans
+    # plugins/ (seul dossier scanne), JAMAIS dans outputs/.
+    assert "ALWAYS goes in the plugins/" in s
+    assert "NEVER in outputs/" in s
 
 
 def test_systeme_impose_la_persistance_multi_etapes():
