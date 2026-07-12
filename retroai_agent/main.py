@@ -632,10 +632,9 @@ def main() -> None:
     sessions.migrer_ancienne_session()
 
     # Plugins : charge le dossier plugins/ et ajoute leurs outils au schema
-    # envoye au modele. Un plugin casse est signale mais ne bloque JAMAIS.
-    nb_plugins, erreurs_plugins = plugins.activer()
-    if nb_plugins:
-        ui.info(f"🔌 {nb_plugins} plugin(s) loaded — type /plugins for details.")
+    # envoye au modele. Chargement SILENCIEUX quand tout va bien (/plugins
+    # pour voir la liste) ; seuls les plugins CASSES sont signales.
+    _, erreurs_plugins = plugins.activer()
     for probleme in erreurs_plugins:
         ui.erreur(f"Plugin ignored: {probleme}")
 
