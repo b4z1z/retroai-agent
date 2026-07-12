@@ -100,7 +100,9 @@ irm https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.p
 ```
 
 Le script clone le dépôt, installe les dépendances, crée la commande `baziz.ia`
-et prépare le fichier `.env`. Il ne reste qu'à y mettre votre clé API.
+et règle le PATH. **Aucune configuration à faire** : au premier lancement,
+l'assistant intégré vous guide pour obtenir la clé API (gratuite) et
+l'enregistre pour vous — voir [La clé API](#-la-clé-api-gratuite) ci-dessous.
 
 ---
 
@@ -121,9 +123,8 @@ source .venv/bin/activate
 # 3. Installer (crée la commande "baziz.ia")
 pip install -e .
 
-# 4. Configurer la clé API
-cp .env.example .env
-nano .env            # renseigner NVIDIA_API_KEY
+# 4. Lancer — l'assistant intégré s'occupe de la clé API au 1er démarrage
+baziz.ia
 ```
 </details>
 
@@ -142,31 +143,55 @@ python -m venv .venv
 # 3. Installer (crée la commande "baziz.ia")
 pip install -e .
 
-# 4. Configurer la clé API
-copy .env.example .env
-notepad .env         # renseigner NVIDIA_API_KEY
+# 4. Lancer — l'assistant intégré s'occupe de la clé API au 1er démarrage
+baziz.ia
 ```
 </details>
 
-### Obtenir une clé API
+### 🔑 La clé API (gratuite)
 
-> 🪄 **Le plus simple : ne configurez rien.** Lancez `baziz.ia` sans clé — un
-> **assistant intégré** s'occupe de tout au premier démarrage : il affiche les
-> étapes, ouvre build.nvidia.com dans votre navigateur, vérifie la clé que
-> vous collez dans le terminal et l'enregistre **automatiquement dans `.env`**.
+BAZIZ.IA fonctionne avec le **palier gratuit** de l'API NVIDIA NIM : il faut
+une clé (elle commence par `nvapi-`), gratuite — un email suffit, aucune
+carte bancaire.
 
-Créez une clé sur [build.nvidia.com](https://build.nvidia.com/) (elle commence
-par `nvapi-`). **Ne la mettez jamais en dur dans le code** : elle vit uniquement
-dans `.env` (ignoré par git) ou dans une variable d'environnement.
+#### 🪄 Méthode recommandée : l'assistant intégré (zéro configuration)
 
-> ⚠️ **`.env` vs `.env.example` — à ne pas confondre :**
+Lancez simplement `baziz.ia`. S'il n'y a pas de clé, l'assistant se lance
+tout seul et fait tout avec vous :
+
+1. Il affiche les étapes et **ouvre [build.nvidia.com](https://build.nvidia.com/)**
+   dans votre navigateur.
+2. Sur le site : **Login** → créez un compte gratuit (email seulement).
+3. Ouvrez n'importe quelle page de modèle → **Get API Key** → **Generate Key**.
+4. Copiez la clé et **collez-la dans le terminal**.
+5. L'assistant la **vérifie auprès de NVIDIA** puis l'enregistre
+   **automatiquement dans `.env`**. C'est fini — pour toujours.
+
+#### ✍️ Méthode manuelle (optionnelle)
+
+<details>
+<summary>Configurer la clé à la main</summary>
+
+Créez la clé sur [build.nvidia.com](https://build.nvidia.com/) (étapes 2-3
+ci-dessus), puis :
+
+```bash
+cp .env.example .env     # Windows : copy .env.example .env
+nano .env                # Windows : notepad .env  → renseigner NVIDIA_API_KEY
+```
+</details>
+
+> 🔒 **Règles de sécurité, dans tous les cas :**
+>
+> - **Jamais** la clé en dur dans le code : elle vit uniquement dans `.env`
+>   (ignoré par git) ou dans une variable d'environnement.
+> - Ne confondez pas les deux fichiers :
 >
 > | Fichier | Rôle | Suivi par git ? | Votre vraie clé ? |
 > |---|---|:---:|:---:|
 > | `.env.example` | Modèle public (montre les variables) | ✅ oui | ❌ **jamais** (garder `nvapi-xxxx`) |
 > | `.env` | Votre configuration locale réelle | ❌ non (ignoré) | ✅ **oui**, ici |
 >
-> Concrètement : `cp .env.example .env`, puis éditez **uniquement `.env`**.
 > Mettre la clé dans `.env.example` la **publierait sur GitHub** → fuite de
 > secret. Ne touchez donc jamais à `.env.example`.
 
