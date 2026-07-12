@@ -30,6 +30,7 @@ from . import modes
 from . import thinking
 from . import sessions
 from . import tuto
+from . import plugins
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -147,6 +148,9 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/model":
             _menu_modele(agent)
+            continue
+        if saisie == "/plugins":
+            ui.afficher_plugins(plugins.liste(), plugins.erreurs())
             continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :
@@ -626,6 +630,14 @@ def main() -> None:
     # Recupere l'ancien fichier de conversation unique (avant le multi-
     # session) dans le nouveau systeme, une seule fois, sans perte.
     sessions.migrer_ancienne_session()
+
+    # Plugins : charge le dossier plugins/ et ajoute leurs outils au schema
+    # envoye au modele. Un plugin casse est signale mais ne bloque JAMAIS.
+    nb_plugins, erreurs_plugins = plugins.activer()
+    if nb_plugins:
+        ui.info(f"🔌 {nb_plugins} plugin(s) loaded — type /plugins for details.")
+    for probleme in erreurs_plugins:
+        ui.erreur(f"Plugin ignored: {probleme}")
 
     # Premier lancement : proposer (avec consentement) de renseigner un profil
     # pour personnaliser l'experience. Memorise pour ne plus redemander ensuite.

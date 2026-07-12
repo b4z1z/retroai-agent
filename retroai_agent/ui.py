@@ -844,6 +844,43 @@ def afficher_jetons(tour: dict, session: dict) -> None:
               "not tokens.")
 
 
+def afficher_plugins(liste: list, problemes: list) -> None:
+    """
+    Commande /plugins : liste les outils ajoutes par le dossier plugins/
+    (nom, description, fichier, ⚠ si soumis a confirmation) + les plugins
+    ignores au chargement (casses), avec la raison.
+    """
+    if RICH_DISPO:
+        t = Text()
+        t.append(f"🔌 Plugins loaded ({len(liste)})\n", style=f"bold {ACCENT}")
+        if not liste:
+            t.append(
+                "\nNone yet. Drop a .py file in the plugins/ folder (see "
+                "plugins/README.md), or simply ASK the agent to create one "
+                "for itself — then /restart.",
+                style=DIM,
+            )
+        for p in liste:
+            t.append(f"\n  {p['nom']:<18}", style="bold")
+            t.append(f"{p['description'][:52]:<54}", style="default")
+            t.append(p["fichier"], style=DIM)
+            if p["dangereux"]:
+                t.append("  ⚠ confirm", style=f"bold {DANGER}")
+        if problemes:
+            t.append(f"\n\nIgnored ({len(problemes)}):\n", style=f"bold {DANGER}")
+            for probleme in problemes:
+                t.append(f"  ✗ {probleme}\n", style=DIM)
+        _console.print()
+        _console.print(Panel(t, border_style=DIM, padding=(1, 3), expand=True))
+    else:
+        print(f"\n[plugins] {len(liste)} loaded")
+        for p in liste:
+            danger = "  [confirm]" if p["dangereux"] else ""
+            print(f"  {p['nom']} - {p['description']} ({p['fichier']}){danger}")
+        for probleme in problemes:
+            print(f"  ignored: {probleme}")
+
+
 def barre_thinking(niveau: str) -> str:
     """
     Barre de progression du niveau de reflexion : se remplit d'un cran par
@@ -962,6 +999,7 @@ COMMANDES = [
     ("/help", "Show this help"),
     ("/tuto", "Replay the interactive getting-started tour"),
     ("/model", "Pick the CHAT model (applied instantly, kept until changed)"),
+    ("/plugins", "List the extra tools loaded from the plugins/ folder"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),

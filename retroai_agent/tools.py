@@ -330,9 +330,11 @@ TOOLS = {
 def executer_outil(nom: str, args: dict, config: Config) -> str:
     """
     Aiguille vers la bonne fonction d'outil et retourne son resultat (str).
-    Si l'outil n'existe pas, retourne un message d'erreur (jamais d'exception).
+    Outils du COEUR d'abord, puis PLUGINS (plugins.py) en repli. Si l'outil
+    n'existe nulle part, message d'erreur (jamais d'exception).
     """
     fonction = TOOLS.get(nom)
     if fonction is None:
-        return f"Error: unknown tool '{nom}'."
+        from . import plugins  # import paresseux (plugins importe tools)
+        return plugins.executer(nom, args, config)
     return fonction(args, config)

@@ -2513,3 +2513,41 @@ ETAT : TERMINE. (/restart pour charger la commande, puis /model.)
 TESTS : test_barre_thinking.py (3 : remplissage par niveau, inconnu ->
 defaut, affichage barre+description). 177 -> 180, tous OK.
 ETAT : TERMINE. (/restart puis /think pour voir la jauge.)
+
+----------------------------------------------------------------
+[2026-07-12] FEATURE MAJEURE : SYSTEME DE PLUGINS 🔌
+----------------------------------------------------------------
+L'agent devient EXTENSIBLE sans toucher au coeur. MVP complet :
+1) plugins.py (NOUVEAU) : contrat minimal (1 fichier .py dans plugins/ =
+   OUTIL {name,description,parameters} + executer(args,config)->str +
+   DANGEREUX optionnel). charger() valide et ISOLE les erreurs (un plugin
+   casse = signale, jamais bloquant ; _fichiers ignores ; doublons refuses).
+   activer() fusionne les schemas dans tools.TOOLS_SCHEMA (idempotent,
+   collision avec un outil du coeur refusee). executer() : confirmation y/n
+   si DANGEREUX (categorie 'command', couverte par auto-all comme le shell),
+   exceptions -> 'Error: ...' renvoye au modele.
+2) tools.executer_outil : repli plugins si l'outil n'est pas au coeur
+   (3 lignes, import paresseux pour eviter le cycle).
+3) main : plugins.activer() au boot ('🔌 N plugin(s) loaded') + commande
+   /plugins (ui.afficher_plugins : nom/description/fichier/⚠ confirm +
+   plugins ignores avec raison). COMMANDES + AIDE_LOGICIEL a jour.
+4) PROMPT SYSTEME, section PLUGINS — demande cle de l'utilisateur : quand
+   l'agent NE PEUT PAS repondre faute de capacite (meteo, web, service...),
+   il ne renvoie PLUS vers des sites : il TERMINE son message en proposant
+   de SE CREER le plugin ('dis oui et je l'ecris, puis /restart'). S'il
+   accepte : 1 petit fichier dans plugins/, API gratuites sans cle
+   preferees (wttr.in).
+5) 2 PLUGINS EXEMPLES livres (templates vivants) : meteo.py (get_weather,
+   wttr.in, montre le reseau) + calculatrice.py (calculate, AST strict sans
+   eval — les LLM se trompent en arithmetique, verifie au test escargot).
+   + plugins/README.md (contrat, regles d'or, astuce 'demande a BAZIZ.IA
+   de se creer un plugin').
+TESTS : test_plugins.py (8 : chargement+dispatch, casse ignore, collision
+refusee, DANGEREUX->confirmation categorie command, exception->Error:,
+outil inconnu, exemples livres valides, calculatrice exacte ET sure contre
+l'injection). 180 -> 188, tous OK.
+VALIDE EN REEL de bout en bout : 'Quel temps fait-il a Fes ?' -> nemotron
+appelle get_weather (1.3s) -> wttr.in reel ('Fes: ☀️ +32°C') -> reponse
+'Il fait actuellement ☀️ 32°C a Fes.' EXACTEMENT le scenario que
+l'utilisateur avait montre en echec avant la feature.
+ETAT : TERMINE ET VALIDE EN REEL. (/restart puis 'quel temps a Fes ?')
