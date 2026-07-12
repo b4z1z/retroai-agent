@@ -47,16 +47,29 @@ if (-not (Get-Command "baziz.ia" -ErrorAction SilentlyContinue)) {
     )
     foreach ($dossierScripts in $candidats) {
         if ($dossierScripts -and (Test-Path (Join-Path $dossierScripts "baziz.ia.exe"))) {
+            # a) PATH PERSISTANT (profil utilisateur) -> tous les FUTURS terminaux.
             $pathUtilisateur = [Environment]::GetEnvironmentVariable("Path", "User")
             if ($pathUtilisateur -notlike "*$dossierScripts*") {
                 [Environment]::SetEnvironmentVariable(
                     "Path", "$pathUtilisateur;$dossierScripts", "User")
-                Write-Host "==> Dossier des commandes ajoute au PATH : $dossierScripts"
-                Write-Host "    (ouvrez un NOUVEAU terminal pour que 'baziz.ia' soit reconnu)"
             }
+            # b) PATH de la SESSION EN COURS -> 'baziz.ia' marche TOUT DE SUITE,
+            #    sans rouvrir de terminal (c'etait le piege : le PATH persistant
+            #    n'affecte pas la fenetre deja ouverte).
+            $env:Path = "$env:Path;$dossierScripts"
+            Write-Host "==> Dossier des commandes ajoute au PATH : $dossierScripts"
             break
         }
     }
+}
+
+# Verification FINALE, sans ambiguite.
+if (Get-Command "baziz.ia" -ErrorAction SilentlyContinue) {
+    Write-Host "==> Verification : la commande 'baziz.ia' est PRETE." -ForegroundColor Green
+} else {
+    Write-Host "==> La commande 'baziz.ia' n'est pas trouvable sur ce systeme." -ForegroundColor Yellow
+    Write-Host "    Utilisez a la place :  python -m retroai_agent.main"
+    Write-Host "    (depuis le dossier $(Get-Location))"
 }
 
 # 5. PAS de copie de .env : au premier lancement sans cle, l'ASSISTANT integre
@@ -64,7 +77,5 @@ if (-not (Get-Command "baziz.ia" -ErrorAction SilentlyContinue)) {
 #    terminal, ecriture automatique dans .env).
 
 Write-Host ""
-Write-Host "==> Termine !"
-Write-Host "    Lancez :  baziz.ia   (dans un NOUVEAU terminal si demande ci-dessus)"
-Write-Host "    ou     :  python -m retroai_agent.main"
+Write-Host "==> Termine !  Lancez :  baziz.ia"
 Write-Host "    Pas de cle API ? L'assistant integre vous guide au 1er lancement."

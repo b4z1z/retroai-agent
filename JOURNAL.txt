@@ -2425,4 +2425,14 @@ le dossier retroai-agent marche toujours, PATH ou pas.
 NOTE : le one-liner irm|iex sert la version GITHUB des scripts -> PUSH requis
 pour que les nouveaux utilisateurs en profitent.
 TESTS : test_config.py +1 (placeholder = absente). 170 -> 171, tous OK.
-ETAT : TERMINE (push necessaire).
+ETAT : TERMINE (push necessaire). Push fait (8441ece..1660e03).
+
+SUITE (meme jour) : l'ami re-teste apres push -> baziz.ia toujours introuvable.
+Causes : (1) mon fix PATH n'ajoutait que le PATH PERSISTANT (profil), qui
+n'affecte PAS la fenetre PowerShell deja ouverte -> il faut un nouveau
+terminal, piege classique ; (2) raw.githubusercontent.com peut servir
+l'ancien install.ps1 en cache quelques minutes apres un push.
+FIX install.ps1 : (a) ajoute AUSSI le dossier au $env:Path de la SESSION EN
+COURS -> baziz.ia marche immediatement, sans rouvrir ; (b) VERIFICATION
+FINALE explicite : vert "la commande baziz.ia est PRETE" si Get-Command la
+voit, sinon jaune avec le repli python -m retroai_agent.main. Syntaxe validee.
