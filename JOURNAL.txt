@@ -2551,3 +2551,6 @@ appelle get_weather (1.3s) -> wttr.in reel ('Fes: ☀️ +32°C') -> reponse
 'Il fait actuellement ☀️ 32°C a Fes.' EXACTEMENT le scenario que
 l'utilisateur avait montre en echec avant la feature.
 ETAT : TERMINE ET VALIDE EN REEL. (/restart puis 'quel temps a Fes ?')
+AJUSTEMENT (retour utilisateur) : boot SILENCIEUX — le message "🔌 N
+plugin(s) loaded" au demarrage est retire (inutile a chaque lancement) ;
+seuls les plugins CASSES restent signales. /plugins pour voir la liste.
