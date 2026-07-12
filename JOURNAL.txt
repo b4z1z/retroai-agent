@@ -2358,3 +2358,20 @@ tokens, sessions, historique fleche haut, tuto).
 ROADMAP RESTANTE : /model, plugins, LICENSE, interrupteur pannes API,
 walkthrough final.
 ETAT : TERMINE.
+
+----------------------------------------------------------------
+[2026-07-12] IMAGE : retour a NVIDIA FLUX.1-dev (gratuit), Gemini en secours
+----------------------------------------------------------------
+Demande : pour la generation d'images, privilegier le modele NVIDIA le plus
+puissant GRATUIT au lieu du montage Gemini. (Le /model general in-app est
+REPORTE — seule l'image est traitee.)
+VERIF SANS COUT : scan des routes genai avec un corps vide (le serveur valide
+la route AVANT de generer -> 404 = absent, pas-404 = existe ; AUCUNE image
+generee, AUCUN credit consomme). Resultat : flux.2-dev, stable-diffusion-3.5-
+large et sdxl-turbo -> 404 ABSENTS du catalogue ; flux.1-dev et flux.1-schnell
+-> presents. Le plus puissant gratuit = black-forest-labs/flux.1-dev (dev >
+schnell en qualite), deja le defaut NVIDIA de l'app.
+BASCULE (.env uniquement, aucun code) : IMAGE_PROVIDER=gemini -> nvidia,
+IMAGE_MODEL=black-forest-labs/flux.1-dev explicite. La cle GEMINI reste dans
+.env : /image permet de rebasculer a tout moment. Verifie via load_config().
+ETAT : TERMINE. (/restart puis /create-image pour tester en reel.)
