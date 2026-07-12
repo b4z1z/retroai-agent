@@ -85,8 +85,10 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
                     continue
             else:
                 courant = thinking.normaliser(agent.config.thinking_level)
+                # Chaque niveau montre sa JAUGE (barre qui se remplit d'un
+                # cran par niveau) : l'effort se voit d'un coup d'oeil.
                 options = [
-                    (n, f"{n:7} — {thinking.DESCRIPTIONS[n]}")
+                    (n, f"{ui.barre_thinking(n)}  {n:7} — {thinking.DESCRIPTIONS[n]}")
                     for n in thinking.NIVEAUX
                 ]
                 choix = ui.selecteur(

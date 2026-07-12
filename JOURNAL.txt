@@ -2486,3 +2486,30 @@ TESTS : test_main_model.py (6 : a-chaud+persiste, annulation, modele courant
 sans reecriture, custom, repli numerote, base en tete de liste + presence
 menu). 171 -> 177, tous OK.
 ETAT : TERMINE. (/restart pour charger la commande, puis /model.)
+
+----------------------------------------------------------------
+[2026-07-12] /think : JAUGE visuelle + mesure REELLE des niveaux
+----------------------------------------------------------------
+1) QUESTION UTILISATEUR "y a-t-il vraiment une difference entre les modes ?"
+   -> MESURE en reel sur nemotron, meme question, niveaux differents :
+   - Question simple (17*23-19*21) : low ~21 tok de raisonnement / medium ~46
+     / ultra ~47 -> ecart modeste, le modele ne sur-reflechit pas un calcul
+     trivial, quel que soit le niveau.
+   - Question dure (puzzle escargot) : low ~1123 tok / ultra ~1930 tok
+     (+72%). Et REVELATION : meme en low, nemotron raisonne beaucoup si le
+     probleme est dur (low avait pourtant repondu FAUX : '20' vs raisonnement
+     plus riche en ultra).
+   CONCLUSION honnete : la difference est REELLE mais C'EST UN REGLAGE
+   "SOUPLE" — nos niveaux = consigne injectee dans le message (+ kwarg
+   thinking pour les modeles qui l'honorent). Le modele reste maitre : il
+   raisonne peu sur du facile meme en ultra, et beaucoup sur du dur meme en
+   low. C'est un CURSEUR D'INTENTION, pas un budget impose (NIM n'expose pas
+   de vrai budget de tokens de raisonnement comme l'API Claude).
+2) JAUGE : ui.barre_thinking(niveau) -> "█░░░░"(low) ... "█████"(ultra),
+   1 cran par niveau. Visible : (a) dans le SELECTEUR /think (chaque option
+   prefixee de sa barre -> l'effort se voit d'un coup d'oeil) ; (b) apres
+   changement, ui.niveau_thinking affiche "🧠 Thinking ███░░ high — thinks
+   step by step" (barre accent + description, repli texte pur aligne).
+TESTS : test_barre_thinking.py (3 : remplissage par niveau, inconnu ->
+defaut, affichage barre+description). 177 -> 180, tous OK.
+ETAT : TERMINE. (/restart puis /think pour voir la jauge.)

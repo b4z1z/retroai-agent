@@ -844,14 +844,32 @@ def afficher_jetons(tour: dict, session: dict) -> None:
               "not tokens.")
 
 
+def barre_thinking(niveau: str) -> str:
+    """
+    Barre de progression du niveau de reflexion : se remplit d'un cran par
+    niveau (low=1/5 ... ultra=5/5). Texte brut (utilisable partout, y compris
+    dans le selecteur a fleches qui n'interprete pas le markup rich).
+    """
+    from . import thinking
+    niveaux = thinking.NIVEAUX
+    k = niveaux.index(thinking.normaliser(niveau)) + 1
+    return "█" * k + "░" * (len(niveaux) - k)
+
+
 def niveau_thinking(niveau: str) -> None:
-    """Affiche le niveau de reflexion courant (apres un changement)."""
+    """Affiche le niveau de reflexion courant, avec sa barre (jauge 1-5)."""
+    from . import thinking
+    barre = barre_thinking(niveau)
+    description = thinking.DESCRIPTIONS.get(thinking.normaliser(niveau), "")
     if RICH_DISPO:
+        k = barre.count("█")
         _console.print(
-            f"[bold {ACCENT}]🧠 Thinking level:[/] [bold]{niveau}[/]"
+            f"[bold {ACCENT}]🧠 Thinking[/] "
+            f"[bold {ACCENT}]{'█' * k}[/][{DIM}]{'░' * (len(barre) - k)}[/] "
+            f"[bold]{niveau}[/] [{DIM}]— {description}[/]"
         )
     else:
-        print(f"  Thinking level: {niveau}")
+        print(f"  Thinking [{barre}] {niveau} — {description}")
 
 
 def mode_actuel() -> None:
