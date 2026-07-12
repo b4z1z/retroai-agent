@@ -2375,3 +2375,28 @@ BASCULE (.env uniquement, aucun code) : IMAGE_PROVIDER=gemini -> nvidia,
 IMAGE_MODEL=black-forest-labs/flux.1-dev explicite. La cle GEMINI reste dans
 .env : /image permet de rebasculer a tout moment. Verifie via load_config().
 ETAT : TERMINE. (/restart puis /create-image pour tester en reel.)
+
+----------------------------------------------------------------
+[2026-07-12] ASSISTANT DE PREMIERE CONFIGURATION (setup guide de la cle API)
+----------------------------------------------------------------
+Idee utilisateur : "le setup t'aide d'avance". Avant, un nouvel utilisateur
+sans .env recevait une erreur seche ("NVIDIA_API_KEY is missing") et devait
+lire le README + creer/editer .env a la main. Desormais :
+NOUVEAU MODULE setup_cle.py : au premier lancement SANS cle, un assistant
+guide de bout en bout : 1) panneau d'accueil (ui.panneau_setup_cle) avec les
+etapes NVIDIA (compte gratuit, email seulement, pas de CB ; Get API Key ->
+Generate Key) ; 2) propose d'OUVRIR build.nvidia.com dans le navigateur
+(webbrowser, stdlib) ; 3) la cle se COLLE directement dans le terminal
+(3 essais, controle de forme nvapi-*) ; 4) VERIFICATION EN LIGNE via GET
+/v1/models (gratuit, aucune inference ; 401/403 = rejetee -> reessai ;
+hors-ligne = None -> on enregistre quand meme, on ne bloque personne) ;
+5) ECRITURE AUTOMATIQUE dans .env (config.set_env_value, deja existant).
+BRANCHEMENT (main.main) : le SystemExit de load_config declenche l'assistant ;
+succes -> load_config() repart ; abandon OU terminal non interactif
+(sys.stdin.isatty, protege tests/CI/pipes) -> erreur classique inchangee.
+README : encadre "Le plus simple : ne configurez rien" dans Obtenir une cle.
+TESTS : test_setup_cle.py (7 : forme de cle, refus hors-tty, cle valide
+ecrite dans .env + os.environ, forme invalide non testee en ligne puis bonne
+cle, rejet 401 x3 -> abandon sans rien ecrire, hors-ligne enregistre quand
+meme, saisie vide annule). 163 -> 170, tous OK.
+ETAT : TERMINE. (Test reel : renommer .env puis lancer baziz.ia.)

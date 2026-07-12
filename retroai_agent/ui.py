@@ -538,6 +538,41 @@ def demander_texte(invite: str) -> str:
     return input(f"  {invite} ").strip()
 
 
+def panneau_setup_cle(url: str) -> None:
+    """
+    Ecran d'accueil de l'ASSISTANT DE PREMIERE CONFIGURATION : s'affiche quand
+    aucune cle API n'est trouvee. Explique, pas a pas, comment obtenir une cle
+    NVIDIA GRATUITE — le but est qu'un nouvel utilisateur soit operationnel
+    sans jamais ouvrir le README ni editer .env a la main.
+    """
+    etapes = [
+        f"1. Go to {url}  (we can open it for you)",
+        "2. Click \"Login\" and create a FREE account — just an email,",
+        "   no credit card asked.",
+        "3. Open any model page and click \"Get API Key\" →",
+        "   \"Generate Key\".",
+        "4. Copy the key (it starts with nvapi-) and paste it below —",
+        "   it will be saved to .env automatically.",
+    ]
+    if RICH_DISPO:
+        t = Text()
+        t.append("👋 Welcome to BAZIZ.IA — first-time setup\n\n",
+                 style=f"bold {ACCENT}")
+        t.append("BAZIZ.IA runs on the FREE tier of the NVIDIA NIM API.\n",
+                 style="default")
+        t.append("You just need a (free) API key. Here is how:\n\n", style=DIM)
+        for e in etapes:
+            t.append(e + "\n", style="default")
+        _console.print()
+        _console.print(Panel(t, border_style=ACCENT, padding=(1, 3),
+                             expand=True))
+    else:
+        print("\n[BAZIZ.IA — first-time setup]")
+        print("A FREE NVIDIA API key is needed. Steps:")
+        for e in etapes:
+            print("  " + e)
+
+
 def lire_multiligne(sentinelle: str = ".") -> str:
     """
     Lit plusieurs lignes au clavier jusqu'a une ligne contenant SEULEMENT la

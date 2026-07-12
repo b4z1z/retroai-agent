@@ -522,9 +522,14 @@ def main() -> None:
     try:
         config = load_config()
     except SystemExit as exc:
-        # load_config leve SystemExit avec un message clair si la cle manque.
-        print(exc)
-        sys.exit(1)
+        # Pas de cle API : au lieu d'echouer avec une erreur seche, on lance
+        # l'ASSISTANT DE PREMIERE CONFIGURATION (guide + navigateur + saisie
+        # de la cle dans le terminal + ecriture .env automatique).
+        from . import setup_cle
+        if setup_cle.assistant_cle() is None:
+            print(exc)  # abandon (ou terminal non interactif) -> aide classique
+            sys.exit(1)
+        config = load_config()  # la cle est maintenant dans os.environ + .env
 
     client = ApiClient(config)
 

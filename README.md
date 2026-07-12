@@ -150,6 +150,11 @@ notepad .env         # renseigner NVIDIA_API_KEY
 
 ### Obtenir une clé API
 
+> 🪄 **Le plus simple : ne configurez rien.** Lancez `baziz.ia` sans clé — un
+> **assistant intégré** s'occupe de tout au premier démarrage : il affiche les
+> étapes, ouvre build.nvidia.com dans votre navigateur, vérifie la clé que
+> vous collez dans le terminal et l'enregistre **automatiquement dans `.env`**.
+
 Créez une clé sur [build.nvidia.com](https://build.nvidia.com/) (elle commence
 par `nvapi-`). **Ne la mettez jamais en dur dans le code** : elle vit uniquement
 dans `.env` (ignoré par git) ou dans une variable d'environnement.
