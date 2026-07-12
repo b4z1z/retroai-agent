@@ -4,6 +4,25 @@ Client CLI **léger** transformant un terminal (Windows, Linux ou macOS) en
 **agent autonome** propulsé par l'API **NVIDIA NIM**. Pensé pour rester léger
 et tourner même sur une machine modeste.
 
+## Pourquoi ce projet ?
+
+Les agents de code en terminal (Claude Code et compagnie) sont géniaux, mais
+**pas toujours accessibles** : abonnement payant, machine récente exigée,
+compatibilité parfois capricieuse selon l'environnement. BAZIZ.IA est né de
+cette problématique :
+
+- 💸 **100 % gratuit** — propulsé par le palier gratuit de l'API NVIDIA NIM
+  (une simple clé sur build.nvidia.com), aucun abonnement.
+- 🖥️ **Tourne partout** — du PC de bureau moderne au vieux portable : pas de
+  framework lourd, une seule vraie dépendance (`requests`).
+- ✨ **Une interface soignée** — expérience terminal inspirée de Claude Code :
+  streaming en direct, spinner de réflexion avec compteur de tokens, panneaux,
+  confirmations claires, sessions multiples, historique de saisie (flèche ↑),
+  tutoriel intégré.
+
+Bref : **l'expérience agent-dans-le-terminal, libre et gratuite**, quand les
+solutions du marché ne sont pas une option.
+
 > 🧩 **N'importe quel modèle du catalogue NVIDIA NIM** — pas seulement Moonshot
 > AI. Vous choisissez librement via `NVIDIA_MODEL` dans `.env` : DeepSeek, Llama
 > (Meta), Qwen, Mistral, Moonshot… La seule condition est que le modèle supporte

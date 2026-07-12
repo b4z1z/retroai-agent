@@ -2342,4 +2342,19 @@ git add .) :
 TESTS : test_agent_loop_prompt.py +1 (le prompt impose outputs/). 162 -> 163.
 REPONSE A LA QUESTION DU JOUR : git push envoie TOUS les commits locaux
 d'avance d'un coup (13 en attente), chacun garde son message/historique.
+ETAT : TERMINE. (Push fait par l'utilisateur : origin/main a jour, 0 d'ecart.)
+
+----------------------------------------------------------------
+[2026-07-11] README "Pourquoi ce projet ?" + ABANDON du deploiement Mint
+----------------------------------------------------------------
+Decision utilisateur : le deploiement sur le vieux PC Linux Mint SORT de la
+roadmap (ce n'est plus un objectif). A la place, le README porte desormais la
+PROBLEMATIQUE du projet, en tete : les agents terminal du marche (Claude Code
+et cie) ne sont pas toujours accessibles (payant, machine recente,
+compatibilite capricieuse) -> BAZIZ.IA = l'alternative 100% GRATUITE (palier
+gratuit NVIDIA NIM), qui tourne partout (leger, une seule vraie dependance),
+avec une interface soignee inspiree de Claude Code (streaming, spinner +
+tokens, sessions, historique fleche haut, tuto).
+ROADMAP RESTANTE : /model, plugins, LICENSE, interrupteur pannes API,
+walkthrough final.
 ETAT : TERMINE.
