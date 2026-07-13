@@ -1,7 +1,6 @@
 {
   "buildCommand": "echo 'static site - no build'",
   "outputDirectory": "plugins",
-  "framework": "nextjs",
   "rewrites": [
     {
       "source": "/(.*)",
