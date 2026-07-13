@@ -137,6 +137,62 @@ def test_catalogue_hors_ligne(monkeypatch):
     assert entrees == [] and "Could not reach" in erreur
 
 
+def test_publier_copie_registre_et_site(tmp_path):
+    """publier() : copie le fichier dans marketplace/plugins/, ajoute (ou
+    remplace) l'entree du registre, et RESYNCHRONISE le bloc inline du site.
+    (Le git push, lui, est fait par le menu apres confirmation.)"""
+    import json
+    # Un plugin local charge...
+    d = _dossier(tmp_path)
+    (d / "outil.py").write_text(CODE_VALIDE, encoding="utf-8")
+    plugins.activer(str(d))
+    # ...et un mini-marketplace avec site.
+    racine = tmp_path / "marketplace"
+    (racine / "plugins").mkdir(parents=True)
+    (racine / "registry.json").write_text(
+        '{"version": 1, "plugins": []}', encoding="utf-8")
+    (racine / "index.html").write_text(
+        "<script>\n/* REGISTRY-START */\nvar REGISTRY = {};\n"
+        "/* REGISTRY-END */\n</script>", encoding="utf-8")
+    try:
+        assert plugins.publier("outil_test", "TESTEUR",
+                               racine=str(racine)) is None
+        # Fichier copie.
+        assert (racine / "plugins" / "outil.py").exists()
+        # Entree registre complete.
+        registre = json.loads((racine / "registry.json").read_text("utf-8"))
+        (entree,) = registre["plugins"]
+        assert entree["nom"] == "outil_test"
+        assert entree["auteur"] == "TESTEUR"
+        assert entree["url"].endswith("marketplace/plugins/outil.py")
+        # Site resynchronise : le bloc inline contient le plugin.
+        html = (racine / "index.html").read_text("utf-8")
+        assert '"nom": "outil_test"' in html
+        # Republier ne duplique PAS l'entree.
+        assert plugins.publier("outil_test", "TESTEUR",
+                               racine=str(racine)) is None
+        registre = json.loads((racine / "registry.json").read_text("utf-8"))
+        assert len(registre["plugins"]) == 1
+    finally:
+        plugins.activer(str(tmp_path / "inexistant"))
+
+
+def test_synchroniser_site_le_vrai_depot():
+    """synchroniser_site() sur le VRAI depot doit etre un no-op propre
+    (registre et inline deja identiques) et ne rien casser."""
+    import json
+    racine = os.path.join(os.path.dirname(__file__), "..", "marketplace")
+    avant = open(os.path.join(racine, "index.html"), encoding="utf-8").read()
+    assert plugins.synchroniser_site(racine) is None
+    apres = open(os.path.join(racine, "index.html"), encoding="utf-8").read()
+    # Toujours parsable et synchro (le test dedie verifie l'egalite exacte).
+    debut = apres.index("var REGISTRY =") + len("var REGISTRY =")
+    fin = apres.index("/* REGISTRY-END */")
+    json.loads(apres[debut:fin].strip().rstrip(";"))
+    assert "<script>" in apres and avant.split("REGISTRY-END")[1] == \
+        apres.split("REGISTRY-END")[1]  # le reste de la page est intact
+
+
 def test_catalogue_inline_du_site_synchronise_avec_registry_json():
     """Le site embarque le catalogue DANS index.html (pour marcher meme en
     double-clic, ou file:// bloque fetch) : ce bloc inline doit rester la

@@ -1,4 +1,3 @@
-import qrcode
 import io
 import base64
 import os
@@ -22,8 +21,14 @@ OUTIL = {
 
 DANGEREUX = False
 
-EC_LEVELS = {"L": qrcode.constants.ERROR_CORRECT_L, "M": qrcode.constants.ERROR_CORRECT_M,
-             "Q": qrcode.constants.ERROR_CORRECT_Q, "H": qrcode.constants.ERROR_CORRECT_H}
+
+def _ec_levels(qrcode):
+    # Construit la table au moment de l'execution (le module qrcode n'est
+    # importe que dans executer(), pour que le plugin se CHARGE partout).
+    return {"L": qrcode.constants.ERROR_CORRECT_L,
+            "M": qrcode.constants.ERROR_CORRECT_M,
+            "Q": qrcode.constants.ERROR_CORRECT_Q,
+            "H": qrcode.constants.ERROR_CORRECT_H}
 
 def format_wifi(ssid, password, security="WPA", hidden=False):
     return f"WIFI:T:{security};S:{ssid};P:{password};H:{'true' if hidden else 'false'};;"
@@ -48,6 +53,11 @@ def format_tel(phone):
     return f"tel:{phone}"
 
 def executer(args, config):
+    try:
+        import qrcode
+    except ImportError:
+        return ("Error: this plugin needs the 'qrcode' "
+                "package. Install it with: pip install qrcode[pil]")
     data = args.get("data", "")
     qr_type = args.get("type", "text")
     size = args.get("size", 10)
@@ -90,7 +100,8 @@ def executer(args, config):
     # Générer le QR code
     qr = qrcode.QRCode(
         version=None,
-        error_correction=EC_LEVELS.get(ec, qrcode.constants.ERROR_CORRECT_M),
+        error_correction=_ec_levels(qrcode).get(
+            ec, qrcode.constants.ERROR_CORRECT_M),
         box_size=size,
         border=border
     )

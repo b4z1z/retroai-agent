@@ -142,12 +142,21 @@ _CATALOGUE = os.path.join(os.path.dirname(__file__), "..",
 
 
 def test_plugins_du_catalogue_valides():
+    """TOUS les plugins publies doivent SE CHARGER sans erreur, meme sans
+    leurs dependances tierces installees (regle : les imports non-stdlib
+    vivent DANS executer(), avec un message 'pip install ...' clair). La
+    liste attendue est DERIVEE du registre : le test suit le catalogue."""
+    import json
+    with open(os.path.join(os.path.dirname(__file__), "..",
+                           "marketplace", "registry.json"),
+              encoding="utf-8") as f:
+        attendus = {e["nom"] for e in json.load(f)["plugins"]}
+
     nb, erreurs = plugins.charger(_CATALOGUE)
     assert erreurs == []
-    assert nb == 4
     noms = {p["nom"] for p in plugins.liste()}
-    assert noms == {"get_weather", "calculate", "current_datetime",
-                    "system_info"}
+    assert noms == attendus
+    assert nb == len(attendus)
 
 
 def test_calculatrice_exacte_et_sure():

@@ -89,6 +89,23 @@ def test_vides_eparpilles_ne_font_pas_abandonner(tmp_path, monkeypatch):
     assert agent.client.appels == 8  # tout a ete rejoue, aucun abandon
 
 
+def test_limite_outils_fait_une_pause_reprenable(tmp_path, monkeypatch):
+    """BUG REEL : '[Limit reached... rephrase your request]' apres une longue
+    tache legitime, et /continue ne reprenait PAS. Desormais : PAUSE, tour
+    marque incomplet, et reprendre() (=/continue) repart d'ou on etait."""
+    monkeypatch.chdir(tmp_path)
+    agent = _agent([_tour_outil() for _ in range(3)] + [_final("Termine !")])
+    agent.config.max_iterations = 2  # petit budget pour le test
+
+    reponse = agent.envoyer("grosse tache")
+    assert "Paused" in reponse and "/continue" in reponse
+    assert agent.tour_incomplet is True          # reprenable !
+
+    suite = agent.reprendre()                    # ce que fait /continue
+    assert suite == "Termine !"
+    assert agent.tour_incomplet is False
+
+
 def test_abandonne_avec_message_clair_si_toujours_vide(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Plus de tours vides que la limite -> message d'aide explicite.

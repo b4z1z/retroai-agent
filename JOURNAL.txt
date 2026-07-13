@@ -2648,3 +2648,42 @@ le navigateur/cache. registry.js supprime (une seule copie a maintenir :
 l'inline). Le test de synchro compare maintenant le bloc inline d'index.html
 a registry.json. Verifie serveur local : 4 plugins, 0 erreur console.
 Pushe (cf8e976). 198 tests.
+
+----------------------------------------------------------------
+[2026-07-14] MARKETPLACE v2 : publication auto-deployee + fixes de la veille
+----------------------------------------------------------------
+Vercel DEPLOYE par l'utilisateur : https://retroai-agent.vercel.app (verifie
+en ligne : les 15 plugins du registre s'affichent -> le "conflit" percu
+etait resolu par les commits de la veille ; outputs/plugins-showcase est une
+vieille page bac-a-sable de BAZIZ.IA, sans rapport avec le site officiel).
+URL_SITE mise a jour partout. Reponses aux problemes rapportes :
+1) "mes plugins crees ne vont pas sur le marketplace" + "auto-deploiement" :
+   NOUVELLE option /plugins > "📤 Publish a plugin to the marketplace
+   (auto-deploy)" : plugins.publier(nom, auteur) copie le fichier dans
+   marketplace/plugins/, ajoute/remplace l'entree registry.json (pas de
+   doublon) et RESYNCHRONISE le bloc inline du site via synchroniser_site()
+   (regeneration programmatique entre les marqueurs REGISTRY-START/END —
+   fini la copie manuelle). Puis, apres confirmation y/n : git add marketplace
+   && commit && push -> VERCEL REDEPLOIE AUTOMATIQUEMENT (~30s). Le plugin
+   est en ligne pour toute la communaute.
+2) "add menu introuvable" : option "➕ Add / create a new plugin" ajoutee au
+   hub (explique les 2 chemins : demander a l'agent, ou deposer un .py).
+3) "[Limit reached...] fix this too" : le garde-fou max_iterations devient
+   une PAUSE REPRENABLE : message clair "Paused... type /continue", tour
+   marque incomplet (self._pause_limite) -> /continue REPREND la tache la ou
+   elle s'est arretee (avant : "rephrase your request" et pas de reprise).
+   MAX_ITERATIONS reste reglable dans .env.
+4) QUALITE CATALOGUE : regle "un plugin doit toujours SE CHARGER" — les
+   imports non-stdlib (qrcode, psutil) deplaces DANS executer() avec message
+   'pip install ...' clair si absent (qrcode.py avait aussi une table
+   EC_LEVELS au niveau module -> devenue _ec_levels(qrcode) a l'execution).
+   Copies locales plugins/ synchronisees : 16 plugins locaux, 0 erreur.
+5) TESTS data-driven : la liste attendue du catalogue est DERIVEE de
+   registry.json (le test suit le catalogue au lieu de coder 4 noms en dur) ;
+   +test publier (copie+registre+site, pas de doublon) ; +test synchroniser_
+   site sur le vrai depot (no-op propre) ; +test pause limite reprenable.
+   198 -> 201, tous OK.
+RESTE (demandes utilisateur a traiter) : "connexion entre sessions pour se
+rappeler des details" (memoire persistante de l'agent) — a concevoir.
+ETAT : TERMINE, a pusher (le push redeploie le site : boucle auto-deploy
+demontree).

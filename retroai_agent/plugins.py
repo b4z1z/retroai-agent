@@ -141,6 +141,88 @@ def executer(nom: str, args: dict, config) -> str:
         return f"Error: plugin '{nom}' failed: {exc}"
 
 
+# --------------------------------------------------------------------------- #
+#  Publication vers le MARKETPLACE (menu /plugins > Publish)                  #
+#                                                                             #
+#  Flux : copier le fichier dans marketplace/plugins/ + ajouter l'entree au   #
+#  registry.json + REGENERER le bloc inline d'index.html (le site). Ensuite   #
+#  main fait git add/commit/push -> Vercel redeploie AUTOMATIQUEMENT.         #
+# --------------------------------------------------------------------------- #
+RACINE_MARKETPLACE = "marketplace"
+URL_BRUTE_BASE = ("https://raw.githubusercontent.com/b4z1z/retroai-agent/"
+                  "main/marketplace/plugins/")
+MARQUEUR_DEBUT = "/* REGISTRY-START */"
+MARQUEUR_FIN = "/* REGISTRY-END */"
+
+
+def synchroniser_site(racine: str = RACINE_MARKETPLACE) -> str | None:
+    """
+    Regenere le bloc inline `var REGISTRY = ...` d'index.html a partir de
+    registry.json (source de verite). Retourne une erreur, ou None si OK.
+    C'est ce qui garantit que le SITE montre toujours la meme chose que le
+    registre — fini les desynchronisations manuelles.
+    """
+    import json
+
+    chemin_registre = os.path.join(racine, "registry.json")
+    chemin_index = os.path.join(racine, "index.html")
+    try:
+        with open(chemin_registre, encoding="utf-8") as f:
+            registre = json.load(f)
+        with open(chemin_index, encoding="utf-8") as f:
+            html = f.read()
+        debut = html.index(MARQUEUR_DEBUT) + len(MARQUEUR_DEBUT)
+        fin = html.index(MARQUEUR_FIN)
+        bloc = ("\n  var REGISTRY = "
+                + json.dumps(registre, ensure_ascii=False, indent=2)
+                + ";\n  ")
+        with open(chemin_index, "w", encoding="utf-8") as f:
+            f.write(html[:debut] + bloc + html[fin:])
+        return None
+    except Exception as exc:
+        return f"Could not sync the site: {exc}"
+
+
+def publier(nom: str, auteur: str = "B4Z1Z",
+            racine: str = RACINE_MARKETPLACE) -> str | None:
+    """
+    Publie le plugin CHARGE 'nom' vers le marketplace local (fichiers du
+    depot) : copie + entree registre (ou mise a jour) + site resynchronise.
+    Le commit/push (qui declenche le deploiement Vercel) est fait par
+    l'appelant. Retourne une erreur, ou None si OK.
+    """
+    import json
+    import shutil
+
+    infos = _REGISTRE.get(nom)
+    if infos is None:
+        return f"Unknown plugin '{nom}' (is it loaded?)."
+    fichier = os.path.basename(infos["fichier"])
+    try:
+        os.makedirs(os.path.join(racine, "plugins"), exist_ok=True)
+        shutil.copyfile(infos["fichier"],
+                        os.path.join(racine, "plugins", fichier))
+        chemin_registre = os.path.join(racine, "registry.json")
+        with open(chemin_registre, encoding="utf-8") as f:
+            registre = json.load(f)
+        entree = {
+            "nom": nom,
+            "fichier": fichier,
+            "description": infos["description"],
+            "auteur": auteur,
+            "url": URL_BRUTE_BASE + fichier,
+            "dangereux": infos["dangereux"],
+        }
+        existantes = [e for e in registre["plugins"] if e.get("nom") != nom]
+        registre["plugins"] = existantes + [entree]
+        with open(chemin_registre, "w", encoding="utf-8") as f:
+            json.dump(registre, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+    except Exception as exc:
+        return f"Could not publish: {exc}"
+    return synchroniser_site(racine)
+
+
 def liste() -> list[dict]:
     """Infos d'affichage pour /plugins (sans les callables)."""
     return [

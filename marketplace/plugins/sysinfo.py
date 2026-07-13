@@ -1,4 +1,3 @@
-import psutil
 import platform
 import os
 
@@ -16,6 +15,11 @@ OUTIL = {
 DANGEREUX = False
 
 def executer(args, config):
+    try:
+        import psutil
+    except ImportError:
+        return ("Error: this plugin needs the 'psutil' "
+                "package. Install it with: pip install psutil")
     info_type = args.get("type", "all")
     out = []
     

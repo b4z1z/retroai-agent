@@ -155,12 +155,13 @@ AIDE_LOGICIEL = (
     "'/create-image a red fox astronaut, watercolor', OR type '/create-image' "
     "alone and it will then ask you for the description.\n"
     "- /plugins : the plugin HUB (arrow menu). Options: see installed "
-    "plugins ; INSTALL new ones from the community marketplace (a shared "
-    "online catalog — the menu downloads and activates them INSTANTLY, no "
-    "restart) ; disable / re-enable a plugin ; delete one. To ADD an ability, "
-    "the user can also drop a .py file in plugins/ or ask YOU to create one "
-    "(you write plugins/<name>.py, then /plugins or /restart loads it). All "
-    "changes apply immediately.\n"
+    "plugins ; ADD/CREATE (drop a .py in plugins/ or ask YOU to write one) ; "
+    "INSTALL from the community marketplace (a shared online catalog — "
+    "downloads and activates INSTANTLY, no restart) ; PUBLISH a local plugin "
+    "TO the marketplace (copies it into the repo, updates the registry and "
+    "the site, then commit+push — the Vercel site auto-deploys in ~30s) ; "
+    "disable / re-enable ; delete. All changes apply immediately. The "
+    "marketplace site is at https://retroai-agent.vercel.app\n"
     "- /model : pick the CHAT model (arrow menu). Shows the current model, "
     "offers verified NVIDIA models plus a custom entry (any id from "
     "build.nvidia.com/models, tool-calling required). The change applies "
@@ -534,8 +535,11 @@ class AgentLoop:
             self.sauver_session()
             raise
 
-        # Succes : tour termine, on sauvegarde l'etat complet.
-        self.tour_incomplet = False
+        # Succes : tour termine, on sauvegarde l'etat complet. Exception : la
+        # PAUSE budget d'outils (garde-fou max_iterations) laisse le tour
+        # marque incomplet pour que /continue reprenne la tache en cours.
+        self.tour_incomplet = getattr(self, "_pause_limite", False)
+        self._pause_limite = False
         self.sauver_session()
         return reponse_finale
 
@@ -653,12 +657,20 @@ class AgentLoop:
                 )
             # On reboucle : le modele voit les resultats et continue.
 
-        # Securite : trop d'iterations d'affilee.
+        # Garde-fou : trop d'iterations d'affilee. Ce n'est PAS un echec —
+        # une longue tache legitime (ex. lire 15 fichiers) peut simplement
+        # depasser le budget d'un tour. On fait donc une PAUSE reprenable :
+        # tour marque incomplet -> /continue repart d'ici (bug reel corrige :
+        # avant, le message disait "rephrase your request" et /continue ne
+        # pouvait pas reprendre).
         message_limite = (
-            "[Limit reached: the agent used too many tools in a row without "
-            "answering. Please rephrase your request.]"
+            f"[Paused: I reached this turn's tool budget "
+            f"({self.config.max_iterations} rounds). Nothing is lost - type "
+            "/continue and I will keep going right where I stopped. (You can "
+            "also raise MAX_ITERATIONS in .env.)]"
         )
         # Message synthetique (pas streame) : main doit l'afficher.
         self._stream_affiche = False
+        self._pause_limite = True
         self.historique.append({"role": "assistant", "content": message_limite})
         return message_limite

@@ -461,7 +461,9 @@ def _menu_plugins() -> None:
         f"marketplace: {plugins.URL_SITE}",
         [
             ("voir", f"📋 See installed plugins ({len(actifs)})"),
+            ("creer", "➕ Add / create a new plugin"),
             ("installer", "🛒 Install from the community marketplace"),
+            ("publier", "📤 Publish a plugin to the marketplace (auto-deploy)"),
             ("desactiver", f"⏸  Disable a plugin ({len(actifs)} active)"),
             ("reactiver", f"▶  Enable a disabled plugin ({len(inactifs)} off)"),
             ("supprimer", "🗑  Delete a plugin file"),
@@ -472,6 +474,65 @@ def _menu_plugins() -> None:
 
     if action == "voir":
         ui.afficher_plugins(plugins.liste(), plugins.erreurs())
+        return
+
+    if action == "creer":
+        ui.info(
+            "Two ways to add a plugin:\n"
+            "  1. The magic one — just ASK me in the chat, e.g.:\n"
+            "     \"crée-toi un plugin qui donne les horaires de prière\"\n"
+            "     I write plugins/<name>.py myself; reopen /plugins and it's "
+            "active.\n"
+            "  2. Manual — drop a .py file in the plugins/ folder "
+            "(contract: plugins/README.md), then reopen /plugins."
+        )
+        return
+
+    if action == "publier":
+        if not actifs:
+            ui.info("No active plugin to publish.")
+            return
+        fichier_ou_nom = _choisir(
+            "Publish", "Pick a plugin to publish to the community "
+            "marketplace:", [(p["nom"], f"{p['nom']} — {p['description'][:52]}")
+                             for p in actifs])
+        if fichier_ou_nom is None:
+            return
+        try:
+            auteur = ui.demander_texte(
+                "Author name shown on the site (Enter = B4Z1Z):"
+            ).strip() or "B4Z1Z"
+        except (EOFError, KeyboardInterrupt):
+            return
+        probleme = plugins.publier(fichier_ou_nom, auteur)
+        if probleme:
+            ui.erreur(probleme)
+            return
+        ui.succes(
+            f"'{fichier_ou_nom}' added to the local marketplace files "
+            "(registry + site synced)."
+        )
+        # Le deploiement = un simple push : Vercel rebuild automatiquement.
+        try:
+            ok = ui.demander_texte(
+                "Commit & push now? Vercel will auto-deploy the site (y/n):"
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if ok not in ("y", "yes", "o", "oui"):
+            ui.info("Not pushed — the plugin will go online with your next "
+                    "git push.")
+            return
+        commande = (
+            'git add marketplace && git commit -m "marketplace: publish '
+            + fichier_ou_nom + '" && git push'
+        )
+        code = subprocess.call(commande, shell=True)
+        if code == 0:
+            ui.succes("Pushed! Vercel is redeploying — the plugin will be "
+                      f"online at {plugins.URL_SITE} in ~30 seconds.")
+        else:
+            ui.erreur("git push failed — check your git setup and retry.")
         return
 
     if action == "installer":
