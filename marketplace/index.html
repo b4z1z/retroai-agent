@@ -72,17 +72,52 @@
   </footer>
 </div>
 
-<script src="registry.js"></script>
 <script>
-  // Le catalogue est le MEME registre que lit l'application (une seule
-  // source de verite sur le depot GitHub). Deux chemins de chargement :
-  //  - registry.js (balise <script> ci-dessus) : marche PARTOUT, y compris
-  //    en ouvrant index.html par double-clic (file:// bloque fetch) ;
-  //  - fetch("registry.json") en secours si registry.js manquait.
-  var promesse = (window.REGISTRY)
-    ? Promise.resolve(window.REGISTRY)
-    : fetch("registry.json").then(function (r) { return r.json(); });
-  promesse
+  // Le CATALOGUE est INTEGRE ici : le site marche donc PARTOUT, y compris
+  // ouvert par simple double-clic (file:// bloque fetch et parfois les
+  // fichiers annexes). La MEME liste vit dans registry.json (lu par
+  // l'application) : un test pytest verifie qu'elles restent IDENTIQUES.
+  /* REGISTRY-START */
+  var REGISTRY = {
+    "version": 1,
+    "site": "https://baziz-plugins.vercel.app",
+    "plugins": [
+      {
+        "nom": "get_weather",
+        "fichier": "meteo.py",
+        "description": "Météo en temps réel pour n'importe quelle ville (wttr.in, gratuit, sans clé)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/meteo.py",
+        "dangereux": false
+      },
+      {
+        "nom": "calculate",
+        "fichier": "calculatrice.py",
+        "description": "Calculatrice exacte et sûre (AST strict, pas d'eval) — les LLM se trompent en arithmétique",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/calculatrice.py",
+        "dangereux": false
+      },
+      {
+        "nom": "current_datetime",
+        "fichier": "horloge.py",
+        "description": "Date et heure actuelles — un LLM ne sait jamais l'heure qu'il est",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/horloge.py",
+        "dangereux": false
+      },
+      {
+        "nom": "system_info",
+        "fichier": "system_info.py",
+        "description": "Infos système : OS, CPU, Python, espace disque (stdlib uniquement)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/system_info.py",
+        "dangereux": false
+      }
+    ]
+  };
+  /* REGISTRY-END */
+  Promise.resolve(REGISTRY)
     .then(function (data) {
       var plugins = data.plugins || [];
       document.getElementById("etat").style.display = "none";

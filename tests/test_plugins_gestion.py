@@ -137,18 +137,19 @@ def test_catalogue_hors_ligne(monkeypatch):
     assert entrees == [] and "Could not reach" in erreur
 
 
-def test_registry_js_synchronise_avec_registry_json():
-    """Le site charge registry.js (marche en double-clic file://, ou fetch
-    est bloque) : il doit rester la COPIE EXACTE de registry.json (la source
-    de verite lue par l'app)."""
+def test_catalogue_inline_du_site_synchronise_avec_registry_json():
+    """Le site embarque le catalogue DANS index.html (pour marcher meme en
+    double-clic, ou file:// bloque fetch) : ce bloc inline doit rester la
+    COPIE EXACTE de registry.json (la source de verite lue par l'app)."""
     import json
     racine = os.path.join(os.path.dirname(__file__), "..", "marketplace")
     with open(os.path.join(racine, "registry.json"), encoding="utf-8") as f:
         source = json.load(f)
-    with open(os.path.join(racine, "registry.js"), encoding="utf-8") as f:
-        js = f.read()
-    debut = js.index("window.REGISTRY =") + len("window.REGISTRY =")
-    copie = json.loads(js[debut:].rstrip().rstrip(";"))
+    with open(os.path.join(racine, "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    debut = html.index("var REGISTRY =") + len("var REGISTRY =")
+    fin = html.index("/* REGISTRY-END */")
+    copie = json.loads(html[debut:fin].strip().rstrip(";"))
     assert copie == source
 
 
