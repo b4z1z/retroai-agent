@@ -2640,3 +2640,11 @@ registry.js reste la copie EXACTE de registry.json (la source de verite de
 l'app ne change pas). Procedure de publication du marketplace/README mise a
 jour (recopier dans les 2 fichiers). Verifie via serveur local : 4 plugins
 affiches. 197 -> 198 tests. Pushe (adfbbbf).
+SUITE 2 — l'utilisateur voyait ENCORE l'erreur (ancienne page en cache ?) :
+solution definitive, le catalogue est desormais INTEGRE dans index.html
+(bloc /* REGISTRY-START */ var REGISTRY = ... /* REGISTRY-END */) -> plus
+AUCUN chargement externe, le double-clic ne peut plus echouer, quel que soit
+le navigateur/cache. registry.js supprime (une seule copie a maintenir :
+l'inline). Le test de synchro compare maintenant le bloc inline d'index.html
+a registry.json. Verifie serveur local : 4 plugins, 0 erreur console.
+Pushe (cf8e976). 198 tests.
