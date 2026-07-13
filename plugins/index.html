@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAZIZ.IA — Plugins Locaux (17 plugins)</title>
+<meta name="description" content="Catalogue local des 17 plugins installés dans BAZIZ.IA">
+<style>
+  :root { --accent:#E03131; --bg:#0d0d0f; --carte:#17171b; --dim:#8b8b93; --texte:#ececf1; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--texte); font-family:ui-monospace,'Cascadia Code',Consolas,monospace; min-height:100vh; }
+  .conteneur { max-width:1000px; margin:0 auto; padding:48px 20px; }
+  header { text-align:center; margin-bottom:40px; }
+  .logo { color:var(--accent); font-weight:bold; font-size:2rem; letter-spacing:2px; }
+  .sous-titre { color:var(--dim); margin-top:8px; }
+  .badge-compteur { display:inline-block; margin-top:14px; padding:4px 14px; border:1px solid var(--accent); border-radius:999px; color:var(--accent); font-size:.9rem; }
+  .howto { background:var(--carte); border:1px solid #26262c; border-radius:10px; padding:18px 22px; margin-bottom:32px; line-height:1.7; }
+  .howto b { color:var(--accent); }
+  code { background:#222228; padding:2px 8px; border-radius:5px; font-size:.92em; }
+  .grille { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+  .carte { background:var(--carte); border:1px solid #26262c; border-radius:10px; padding:20px; display:flex; flex-direction:column; gap:10px; transition:border-color .15s; }
+  .carte:hover { border-color:var(--accent); }
+  .carte h3 { color:var(--accent); font-size:1.05rem; word-break:break-all; }
+  .carte .danger { color:#ffb224; font-size:.72rem; border:1px solid #4a3a12; background:#241d0a; border-radius:999px; padding:2px 10px; margin-left:6px; vertical-align:middle; }
+  .carte p { color:var(--texte); font-size:.9rem; line-height:1.55; flex:1; }
+  .meta { color:var(--dim); font-size:.78rem; display:flex; justify-content:space-between; }
+  .actions { display:flex; gap:8px; margin-top:6px; }
+  .btn { flex:1; text-align:center; padding:8px 10px; border-radius:7px; font-size:.82rem; cursor:pointer; border:1px solid #33333a; background:#202026; color:var(--texte); text-decoration:none; }
+  .btn:hover { border-color:var(--accent); }
+  .btn-accent { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:bold; }
+  footer { text-align:center; color:var(--dim); margin-top:48px; font-size:.85rem; line-height:1.8; }
+  footer a { color:var(--accent); text-decoration:none; }
+  .filtre { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .filtre-btn { padding:6px 14px; border:1px solid #33333a; background:#202026; color:var(--texte); border-radius:999px; cursor:pointer; font-size:.85rem; }
+  .filtre-btn:hover, .filtre-btn.active { border-color:var(--accent); color:var(--accent); }
+  .stats { display:flex; gap:20px; margin-bottom:20px; flex-wrap:wrap; font-size:.85rem; color:var(--dim); }
+  .stat { background:var(--carte); border:1px solid #26262c; border-radius:8px; padding:8px 16px; }
+  .stat b { color:var(--texte); }
+</style>
+</head>
+<body>
+<div class="conteneur">
+  <header>
+    <div class="logo">BAZIZ.IA</div>
+    <div class="sous-titre">🔌 Plugins Locaux — 17 outils installés</div>
+    <div class="badge-compteur" id="compteur">17 plugins</div>
+  </header>
+
+  <div class="howto">
+    <b>Utilisation :</b> Ces plugins sont <b>déjà installés</b> dans ton dossier <code>plugins/</code> local.<br>
+    Tape <code>/plugins</code> dans BAZIZ.IA → ils sont listés et actifs immédiatement (pas de redémarrage nécessaire).<br>
+    <b>Déployer ce catalogue :</b> dépose ce fichier où tu veux (Vercel, Netlify, GitHub Pages, ton serveur) — c'est un fichier statique unique.
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>17</b> plugins totaux</div>
+    <div class="stat"><b>3</b> avec accès étendu 🔐</div>
+    <div class="stat"><b>14</b> sûrs (lecture seule)</div>
+    <div class="stat"><b>~30</b> lignes chacun en moyenne</div>
+  </div>
+
+  <div class="filtre" id="filtres"></div>
+
+  <div class="grille" id="grille"></div>
+
+  <footer>
+    Généré pour <a href="https://github.com/b4z1z/retroai-agent">RetroAI Agent (BAZIZ.IA)</a> — l'agent IA de terminal <b>100 % gratuit</b> (NVIDIA NIM).<br>
+    🔐 <b>accès étendu</b> = le plugin touche à vos fichiers, système ou données sensibles : confirmation à chaque exécution.
+  </footer>
+</div>
+
+<script>
+/* PLUGINS-START */
+var PLUGINS = [
+  {
+    "nom": "calculator",
+    "fichier": "calculator.py",
+    "description": "Calculatrice avancée : expressions math, conversions, statistiques (sin, cos, sqrt, %, USD/EUR, stats 1,2,3...)",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/calculator.py",
+    "dangereux": false
+  },
+  {
+    "nom": "calculate",
+    "fichier": "calculatrice.py",
+    "description": "Calculatrice exacte et sûre (AST strict, pas d'eval) — les LLM se trompent en arithmétique",
+    "auteur": "B4Z1Z",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/calculatrice.py",
+    "dangereux": false
+  },
+  {
+    "nom": "crypto",
+    "fichier": "crypto.py",
+    "description": "Prix crypto en temps réel via CoinGecko (gratuit, sans clé API) — bitcoin, ethereum, solana...",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/crypto.py",
+    "dangereux": false
+  },
+  {
+    "nom": "file_ops",
+    "fichier": "file_ops.py",
+    "description": "Opérations fichiers : lire, écrire, lister, copier, déplacer, supprimer, chercher, créer dossiers",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/file_ops.py",
+    "dangereux": true
+  },
+  {
+    "nom": "git",
+    "fichier": "git.py",
+    "description": "Helper Git (status, diff, log, commit, push, pull, branch, add, diff-staged, stash) via shell",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/git.py",
+    "dangereux": true
+  },
+  {
+    "nom": "git_helper",
+    "fichier": "git_helper.py",
+    "description": "Commandes Git rapides : status, diff, log, commit, push, pull, branch, add (sans shell=True)",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/git_helper.py",
+    "dangereux": true
+  },
+  {
+    "nom": "current_datetime",
+    "fichier": "horloge.py",
+    "description": "Date et heure actuelles — un LLM ne sait jamais l'heure qu'il est",
+    "auteur": "B4Z1Z",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/horloge.py",
+    "dangereux": false
+  },
+  {
+    "nom": "get_weather",
+    "fichier": "meteo.py",
+    "description": "Météo en temps réel pour n'importe quelle ville (wttr.in, gratuit, sans clé)",
+    "auteur": "B4Z1Z",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/meteo.py",
+    "dangereux": false
+  },
+  {
+    "nom": "network_tool",
+    "fichier": "network.py",
+    "description": "Outils réseau : ping, DNS, IP info, port scan, HTTP check, traceroute (stdlib + API gratuites)",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/network.py",
+    "dangereux": false
+  },
+  {
+    "nom": "notes",
+    "fichier": "notes.py",
+    "description": "Gestionnaire de notes : ajouter, lister, chercher, supprimer, afficher (stockage local JSON)",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/notes.py",
+    "dangereux": false
+  },
+  {
+    "nom": "password",
+    "fichier": "password.py",
+    "description": "Générateur de mots de passe sécurisés (aléatoire, passphrase, options complètes)",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/password.py",
+    "dangereux": false
+  },
+  {
+    "nom": "qrcode",
+    "fichier": "qrcode.py",
+    "description": "Générateur de QR codes (texte, URL, WiFi, vCard, email, SMS, tel) — sortie PNG ou base64",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/qrcode.py",
+    "dangereux": false
+  },
+  {
+    "nom": "sysinfo",
+    "fichier": "sysinfo.py",
+    "description": "Informations système complètes (CPU, RAM, disque, réseau, processus top 10) via psutil",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/sysinfo.py",
+    "dangereux": false
+  },
+  {
+    "nom": "system_info",
+    "fichier": "system_info.py",
+    "description": "Infos système basiques : OS, machine, Python, CPU count, espace disque (stdlib uniquement)",
+    "auteur": "B4Z1Z",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/system_info.py",
+    "dangereux": false
+  },
+  {
+    "nom": "translate",
+    "fichier": "translate.py",
+    "description": "Traducteur via LibreTranslate (gratuit, sans clé API) — 20+ langues supportées",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/translate.py",
+    "dangereux": false
+  },
+  {
+    "nom": "web_search",
+    "fichier": "web_search.py",
+    "description": "Recherche web via DuckDuckGo (HTML scraping, sans clé API) — 5 résultats par défaut",
+    "auteur": "BAZIZ.IA (built-in)",
+    "url": "https://github.com/b4z1z/retroai-agent/blob/main/plugins/web_search.py",
+    "dangereux": false
+  }
+];
+/* PLUGINS-END */
+
+Promise.resolve(PLUGINS).then(function (data) {
+  var plugins = data;
+  var grille = document.getElementById("grille");
+  var filtresDiv = document.getElementById("filtres");
+  var compteur = document.getElementById("compteur");
+  var filtreActif = "tous";
+
+  function compter() {
+    var total = plugins.length;
+    var dangers = plugins.filter(function(p) { return p.dangereux; }).length;
+    var surs = total - dangers;
+    compteur.textContent = total + " plugins (" + surs + " sûrs, " + dangers + " 🔐)";
+  }
+
+  function creerFiltres() {
+    var categories = [
+      {id: "tous", label: "Tous (" + plugins.length + ")"},
+      {id: "surs", label: "Sûrs (" + plugins.filter(function(p){return !p.dangereux;}).length + ")"},
+      {id: "dangereux", label: "🔐 Accès étendu (" + plugins.filter(function(p){return p.dangereux;}).length + ")"},
+      {id: "calcul", label: "🧮 Calcul (2)"},
+      {id: "systeme", label: "💻 Système (3)"},
+      {id: "reseau", label: "🌐 Réseau (2)"},
+      {id: "git", label: "📦 Git (2)"},
+      {id: "fichiers", label: "📁 Fichiers (1)"},
+      {id: "crypto", label: "₿ Crypto (1)"},
+      {id: "autres", label: "🔧 Autres (6)"}
+    ];
+    categories.forEach(function(cat) {
+      var btn = document.createElement("button");
+      btn.className = "filtre-btn" + (cat.id === "tous" ? " active" : "");
+      btn.textContent = cat.label;
+      btn.dataset.filtre = cat.id;
+      btn.onclick = function() {
+        filtreActif = cat.id;
+        document.querySelectorAll(".filtre-btn").forEach(function(b){b.classList.remove("active");});
+        btn.classList.add("active");
+        afficher();
+      };
+      filtresDiv.appendChild(btn);
+    });
+  }
+
+  function correspondFiltre(p) {
+    if (filtreActif === "tous") return true;
+    if (filtreActif === "surs") return !p.dangereux;
+    if (filtreActif === "dangereux") return p.dangereux;
+    if (filtreActif === "calcul") return ["calculator", "calculate"].includes(p.nom);
+    if (filtreActif === "systeme") return ["sysinfo", "system_info", "current_datetime"].includes(p.nom);
+    if (filtreActif === "reseau") return ["network_tool", "web_search", "get_weather", "translate", "crypto"].includes(p.nom);
+    if (filtreActif === "git") return ["git", "git_helper"].includes(p.nom);
+    if (filtreActif === "fichiers") return ["file_ops", "notes", "password", "qrcode"].includes(p.nom);
+    if (filtreActif === "crypto") return ["crypto"].includes(p.nom);
+    if (filtreActif === "autres") return !["calculator","calculate","sysinfo","system_info","current_datetime","network_tool","web_search","get_weather","translate","crypto","git","git_helper","file_ops","notes","password","qrcode"].includes(p.nom);
+    return true;
+  }
+
+  function afficher() {
+    grille.innerHTML = "";
+    var filtres = plugins.filter(correspondFiltre);
+    filtres.forEach(function (p) {
+      var carte = document.createElement("div");
+      carte.className = "carte";
+      carte.innerHTML =
+        "<h3>" + p.nom + (p.dangereux ? " <span class='danger'>🔐 accès étendu</span>" : "") + "</h3>" +
+        "<p>" + p.description + "</p>" +
+        "<div class='meta'><span>par " + (p.auteur || "?") + "</span><span>" + p.fichier + "</span></div>" +
+        "<div class='actions'>" +
+        "<a class='btn' href='" + p.url + "' target='_blank'>Voir le code</a>" +
+        "<span class='btn btn-accent' onclick='copier(this, \"" + p.url + "\")'>Copier l'URL</span>" +
+        "</div>";
+      grille.appendChild(carte);
+    });
+    if (filtres.length === 0) {
+      grille.innerHTML = "<div style='text-align:center;color:var(--dim);padding:40px;grid-column:1/-1;'>Aucun plugin pour ce filtre</div>";
+    }
+  }
+
+  window.copier = function(bouton, url) {
+    navigator.clipboard.writeText(url).then(function () {
+      var avant = bouton.textContent;
+      bouton.textContent = "Copié ✓";
+      setTimeout(function () { bouton.textContent = avant; }, 1500);
+    });
+  };
+
+  compter();
+  creerFiltres();
+  afficher();
+}).catch(function () {
+  document.getElementById("grille").innerHTML = "<div style='text-align:center;color:var(--dim);padding:40px;'>Erreur de chargement</div>";
+});
+</script>
+</body>
+</html>
