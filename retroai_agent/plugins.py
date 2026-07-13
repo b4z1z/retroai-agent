@@ -150,22 +150,46 @@ def executer(nom: str, args: dict, config) -> str:
 # --------------------------------------------------------------------------- #
 RACINE_MARKETPLACE = "marketplace"
 
-# Publication protegee par MOT DE PASSE. On ne stocke QUE l'empreinte
-# SHA-256 (pas le mot de passe en clair : lire le code ne le revele pas).
-# Surchargeable via la variable d'env MARKETPLACE_MDP_SHA256 pour en changer
-# (nouvelle empreinte : python -c "import hashlib;
-#  print(hashlib.sha256('nouveau_mdp'.encode()).hexdigest())").
-MDP_PUBLICATION_SHA256 = os.environ.get(
-    "MARKETPLACE_MDP_SHA256",
-    "4c980fbf86f92dd7d566cbec992f9a059b89cbcbccdf3483a448a0ab16835f34",
-)
+# Publication par IDENTITE GIT (modele Pull Request GitHub) :
+#  - le PROPRIETAIRE (email git ci-dessous) publie DIRECTEMENT — ses
+#    credentials git sont la vraie autorisation, GitHub refuse le push aux
+#    autres de toute facon ;
+#  - un CONTRIBUTEUR passe par une Pull Request : GitHub previent le
+#    proprietaire PAR EMAIL (notification native), il relit et approuve, la
+#    fusion redeploie le site automatiquement.
+# (Remplace l'ancien mot de passe applicatif, contournable en editant les
+# fichiers ; l'identite git + droits GitHub ne le sont pas.)
+# Le proprietaire peut avoir PLUSIEURS identites git (compte GitHub +
+# email de config locale). Liste surchargeable via env (emails separes
+# par des virgules).
+EMAILS_PROPRIETAIRE = {
+    e.strip().lower()
+    for e in os.environ.get(
+        "MARKETPLACE_OWNER_EMAIL",
+        "bazizdev07@gmail.com,a.mekouar@esisa.ac.ma",
+    ).split(",")
+    if e.strip()
+}
+URL_DEPOT = "https://github.com/b4z1z/retroai-agent"
 
 
-def verifier_mdp_publication(mdp: str) -> bool:
-    """Compare l'empreinte SHA-256 de la saisie a celle attendue."""
-    import hashlib
-    return hashlib.sha256(mdp.encode("utf-8")).hexdigest() == \
-        MDP_PUBLICATION_SHA256
+def est_proprietaire(email: str | None = None) -> bool:
+    """
+    Vrai si l'identite git courante est celle du proprietaire du marketplace.
+    email=None -> lit `git config user.email` (parametre injectable pour les
+    tests). En cas de doute (git absent...), on repond False : le parcours
+    contributeur (PR) est toujours SUR, jamais bloquant.
+    """
+    if email is None:
+        import subprocess
+        try:
+            email = subprocess.run(
+                ["git", "config", "user.email"],
+                capture_output=True, text=True, timeout=10,
+            ).stdout.strip()
+        except Exception:
+            return False
+    return bool(email) and email.lower() in EMAILS_PROPRIETAIRE
 URL_BRUTE_BASE = ("https://raw.githubusercontent.com/b4z1z/retroai-agent/"
                   "main/marketplace/plugins/")
 MARQUEUR_DEBUT = "/* REGISTRY-START */"

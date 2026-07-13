@@ -2698,3 +2698,24 @@ MARKETPLACE_MDP_SHA256 (commande de generation en commentaire dans
 plugins.py). Un test verifie meme que le clair n'apparait PAS dans le code.
 NB : protection "pour l'instant" assumee — le verrou REEL reste le push git
 (credentials GitHub) ; ce mdp est un portillon applicatif. 201 -> 202 tests.
+
+SUITE — le MDP remplace par l'IDENTITE GIT (modele Pull Request). Chemin :
+l'utilisateur a lui-meme identifie que le mdp etait contournable en editant
+les fichiers, puis a propose : "si c'est mon compte git -> publie sans
+autorisation ; sinon -> je recois un signalement dans mon Gmail pour
+approuver". C'est EXACTEMENT le modele PR de GitHub (email de notification
+NATIF sur chaque PR — zero infra a construire). Implementation :
+- plugins.est_proprietaire(email=None) : compare `git config user.email` a
+  EMAILS_PROPRIETAIRE (bazizdev07@gmail.com + a.mekouar@esisa.ac.ma — piege
+  reel trouve par le test terrain : l'email git LOCAL n'est pas le Gmail !
+  liste surchargeable via MARKETPLACE_OWNER_EMAIL, virgules). Doute = False
+  -> parcours contributeur, jamais bloquant.
+- /plugins > Publish : PROPRIETAIRE -> commit+push direct (ses credentials
+  git sont la vraie autorisation) ; CONTRIBUTEUR -> fichiers prepares + guide
+  PR en 3 etapes (fork, push, ouvrir la PR) -> GitHub emaille le proprietaire
+  -> il relit/approuve -> merge -> Vercel redeploie. Le mdp et son empreinte
+  SHA-256 sont RETIRES (l'identite git + droits GitHub sont incontournables,
+  eux). Verifie sur machine reelle : est_proprietaire()=True ici.
+202 tests. LECON (pour le walkthrough final) : un secret verifie cote client
+n'est jamais une barriere ; la vraie autorisation vit cote serveur — ici,
+les droits de push GitHub.

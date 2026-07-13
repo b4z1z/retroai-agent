@@ -492,24 +492,6 @@ def _menu_plugins() -> None:
         if not actifs:
             ui.info("No active plugin to publish.")
             return
-        # Publication protegee : mot de passe (saisie MASQUEE), 3 essais.
-        # Seule l'empreinte SHA-256 existe dans le code, pas le mdp en clair.
-        import getpass
-        for essai in range(3):
-            try:
-                try:
-                    mdp = getpass.getpass("  Marketplace password: ")
-                except Exception:          # environnement sans saisie masquee
-                    mdp = ui.demander_texte("Marketplace password:")
-            except (EOFError, KeyboardInterrupt):
-                ui.info("\nCancelled.")
-                return
-            if plugins.verifier_mdp_publication(mdp):
-                break
-            ui.erreur(f"Wrong password ({essai + 1}/3).")
-        else:
-            ui.erreur("Publication cancelled (wrong password).")
-            return
         fichier_ou_nom = _choisir(
             "Publish", "Pick a plugin to publish to the community "
             "marketplace:", [(p["nom"], f"{p['nom']} — {p['description'][:52]}")
@@ -530,6 +512,23 @@ def _menu_plugins() -> None:
             f"'{fichier_ou_nom}' added to the local marketplace files "
             "(registry + site synced)."
         )
+        # AIGUILLAGE PAR IDENTITE GIT (modele Pull Request) :
+        #  - proprietaire -> publication DIRECTE (ses credentials git sont
+        #    l'autorisation ; GitHub refuserait le push a quiconque d'autre) ;
+        #  - contributeur -> Pull Request : le proprietaire recoit l'EMAIL de
+        #    notification GitHub, relit, approuve ; la fusion redeploie.
+        if not plugins.est_proprietaire():
+            ui.info(
+                "You are not the marketplace owner — publication goes "
+                "through a Pull Request (the owner gets an email from "
+                "GitHub to review and approve):\n"
+                f"  1. Fork {plugins.URL_DEPOT} (button 'Fork' on GitHub)\n"
+                "  2. Push your fork with these marketplace changes\n"
+                f"  3. Open a Pull Request on {plugins.URL_DEPOT}/pulls\n"
+                "Once approved and merged, the site auto-deploys and your "
+                "plugin becomes installable by everyone."
+            )
+            return
         # Le deploiement = un simple push : Vercel rebuild automatiquement.
         try:
             ok = ui.demander_texte(

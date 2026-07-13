@@ -137,18 +137,15 @@ def test_catalogue_hors_ligne(monkeypatch):
     assert entrees == [] and "Could not reach" in erreur
 
 
-def test_mdp_publication():
-    """La publication est protegee par mot de passe : seule l'empreinte
-    SHA-256 vit dans le code (pas de mdp en clair), surchargeable par env."""
-    import hashlib
-    bon = "bazizdev07"
-    assert plugins.verifier_mdp_publication(bon)
-    assert not plugins.verifier_mdp_publication("mauvais")
-    assert not plugins.verifier_mdp_publication("")
-    # Le code ne contient PAS le mot de passe en clair, juste l'empreinte.
-    src = open(plugins.__file__, encoding="utf-8").read()
-    assert bon not in src
-    assert hashlib.sha256(bon.encode()).hexdigest() in src
+def test_publication_par_identite_git():
+    """Modele Pull Request : le PROPRIETAIRE (email git) publie direct ; tout
+    autre email part sur le parcours PR (l'owner recoit l'email GitHub et
+    approuve). Insensible a la casse ; inconnu/vide = pas proprietaire."""
+    assert plugins.est_proprietaire("bazizdev07@gmail.com")
+    assert plugins.est_proprietaire("BazizDev07@Gmail.com")   # casse ignoree
+    assert plugins.est_proprietaire("a.mekouar@esisa.ac.ma")  # config locale
+    assert not plugins.est_proprietaire("inconnu@example.com")
+    assert not plugins.est_proprietaire("")
 
 
 def test_publier_copie_registre_et_site(tmp_path):
