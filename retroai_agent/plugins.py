@@ -212,7 +212,7 @@ URL_REGISTRE = os.environ.get(
     "marketplace/registry.json",
 )
 URL_SITE = os.environ.get(
-    "MARKETPLACE_SITE", "https://baziz-plugins.vercel.app"
+    "MARKETPLACE_SITE", "https://retroai-agent.vercel.app"
 )
 
 

@@ -25,7 +25,7 @@ confirmation avant tout téléchargement de code.
 4. Framework preset : **Other** (site statique, aucun build)
 5. **Deploy** — c'est tout. Chaque `git push` redéploie automatiquement.
 
-Ensuite, mettez l'URL obtenue (ex. `https://baziz-plugins.vercel.app`) dans
+Ensuite, mettez l'URL obtenue (ex. `https://retroai-agent.vercel.app`) dans
 `retroai_agent/plugins.py` (`URL_SITE`) si elle diffère.
 
 > Alternative sans Vercel : GitHub Pages (Settings → Pages → branche main,
