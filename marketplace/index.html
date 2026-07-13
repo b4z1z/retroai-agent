@@ -72,11 +72,17 @@
   </footer>
 </div>
 
+<script src="registry.js"></script>
 <script>
-  // Le catalogue est le MEME registry.json que lit l'application : une seule
-  // source de verite (le depot GitHub), le site n'est que la vitrine.
-  fetch("registry.json")
-    .then(function (r) { return r.json(); })
+  // Le catalogue est le MEME registre que lit l'application (une seule
+  // source de verite sur le depot GitHub). Deux chemins de chargement :
+  //  - registry.js (balise <script> ci-dessus) : marche PARTOUT, y compris
+  //    en ouvrant index.html par double-clic (file:// bloque fetch) ;
+  //  - fetch("registry.json") en secours si registry.js manquait.
+  var promesse = (window.REGISTRY)
+    ? Promise.resolve(window.REGISTRY)
+    : fetch("registry.json").then(function (r) { return r.json(); });
+  promesse
     .then(function (data) {
       var plugins = data.plugins || [];
       document.getElementById("etat").style.display = "none";

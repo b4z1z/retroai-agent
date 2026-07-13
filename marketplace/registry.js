@@ -1,0 +1,41 @@
+// Copie JS du registre pour que le site marche AUSSI ouvert en
+// double-clic (file:// bloque fetch, pas les <script>).
+// SYNC avec registry.json — un test pytest verifie l egalite.
+window.REGISTRY = {
+  "version": 1,
+  "site": "https://baziz-plugins.vercel.app",
+  "plugins": [
+    {
+      "nom": "get_weather",
+      "fichier": "meteo.py",
+      "description": "Météo en temps réel pour n'importe quelle ville (wttr.in, gratuit, sans clé)",
+      "auteur": "B4Z1Z",
+      "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/meteo.py",
+      "dangereux": false
+    },
+    {
+      "nom": "calculate",
+      "fichier": "calculatrice.py",
+      "description": "Calculatrice exacte et sûre (AST strict, pas d'eval) — les LLM se trompent en arithmétique",
+      "auteur": "B4Z1Z",
+      "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/calculatrice.py",
+      "dangereux": false
+    },
+    {
+      "nom": "current_datetime",
+      "fichier": "horloge.py",
+      "description": "Date et heure actuelles — un LLM ne sait jamais l'heure qu'il est",
+      "auteur": "B4Z1Z",
+      "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/horloge.py",
+      "dangereux": false
+    },
+    {
+      "nom": "system_info",
+      "fichier": "system_info.py",
+      "description": "Infos système : OS, CPU, Python, espace disque (stdlib uniquement)",
+      "auteur": "B4Z1Z",
+      "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/system_info.py",
+      "dangereux": false
+    }
+  ]
+};

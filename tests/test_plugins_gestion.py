@@ -137,6 +137,21 @@ def test_catalogue_hors_ligne(monkeypatch):
     assert entrees == [] and "Could not reach" in erreur
 
 
+def test_registry_js_synchronise_avec_registry_json():
+    """Le site charge registry.js (marche en double-clic file://, ou fetch
+    est bloque) : il doit rester la COPIE EXACTE de registry.json (la source
+    de verite lue par l'app)."""
+    import json
+    racine = os.path.join(os.path.dirname(__file__), "..", "marketplace")
+    with open(os.path.join(racine, "registry.json"), encoding="utf-8") as f:
+        source = json.load(f)
+    with open(os.path.join(racine, "registry.js"), encoding="utf-8") as f:
+        js = f.read()
+    debut = js.index("window.REGISTRY =") + len("window.REGISTRY =")
+    copie = json.loads(js[debut:].rstrip().rstrip(";"))
+    assert copie == source
+
+
 def test_registre_du_depot_coherent():
     """Le registry.json LIVRE doit etre un JSON valide dont chaque entree a
     nom/fichier/url, et chaque fichier reference existe dans marketplace/."""

@@ -48,5 +48,8 @@ Ensuite, mettez l'URL obtenue (ex. `https://baziz-plugins.vercel.app`) dans
 }
 ```
 
-4. Ouvrez une **pull request** — une fois fusionnée, le plugin apparaît sur
+4. Recopiez le même contenu dans **`registry.js`** (`window.REGISTRY = …`) —
+   c'est lui qui permet au site de marcher même ouvert en double-clic
+   (un test pytest vérifie que les deux fichiers restent identiques).
+5. Ouvrez une **pull request** — une fois fusionnée, le plugin apparaît sur
    le site ET devient installable par tous les utilisateurs via `/plugins`.
