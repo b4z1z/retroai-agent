@@ -149,6 +149,23 @@ def executer(nom: str, args: dict, config) -> str:
 #  main fait git add/commit/push -> Vercel redeploie AUTOMATIQUEMENT.         #
 # --------------------------------------------------------------------------- #
 RACINE_MARKETPLACE = "marketplace"
+
+# Publication protegee par MOT DE PASSE. On ne stocke QUE l'empreinte
+# SHA-256 (pas le mot de passe en clair : lire le code ne le revele pas).
+# Surchargeable via la variable d'env MARKETPLACE_MDP_SHA256 pour en changer
+# (nouvelle empreinte : python -c "import hashlib;
+#  print(hashlib.sha256('nouveau_mdp'.encode()).hexdigest())").
+MDP_PUBLICATION_SHA256 = os.environ.get(
+    "MARKETPLACE_MDP_SHA256",
+    "4c980fbf86f92dd7d566cbec992f9a059b89cbcbccdf3483a448a0ab16835f34",
+)
+
+
+def verifier_mdp_publication(mdp: str) -> bool:
+    """Compare l'empreinte SHA-256 de la saisie a celle attendue."""
+    import hashlib
+    return hashlib.sha256(mdp.encode("utf-8")).hexdigest() == \
+        MDP_PUBLICATION_SHA256
 URL_BRUTE_BASE = ("https://raw.githubusercontent.com/b4z1z/retroai-agent/"
                   "main/marketplace/plugins/")
 MARQUEUR_DEBUT = "/* REGISTRY-START */"

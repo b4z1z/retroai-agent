@@ -492,6 +492,24 @@ def _menu_plugins() -> None:
         if not actifs:
             ui.info("No active plugin to publish.")
             return
+        # Publication protegee : mot de passe (saisie MASQUEE), 3 essais.
+        # Seule l'empreinte SHA-256 existe dans le code, pas le mdp en clair.
+        import getpass
+        for essai in range(3):
+            try:
+                try:
+                    mdp = getpass.getpass("  Marketplace password: ")
+                except Exception:          # environnement sans saisie masquee
+                    mdp = ui.demander_texte("Marketplace password:")
+            except (EOFError, KeyboardInterrupt):
+                ui.info("\nCancelled.")
+                return
+            if plugins.verifier_mdp_publication(mdp):
+                break
+            ui.erreur(f"Wrong password ({essai + 1}/3).")
+        else:
+            ui.erreur("Publication cancelled (wrong password).")
+            return
         fichier_ou_nom = _choisir(
             "Publish", "Pick a plugin to publish to the community "
             "marketplace:", [(p["nom"], f"{p['nom']} — {p['description'][:52]}")
