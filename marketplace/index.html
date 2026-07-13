@@ -76,7 +76,7 @@
   // Le CATALOGUE est INTEGRE ici : le site marche donc PARTOUT, y compris
   // ouvert par simple double-clic (file:// bloque fetch et parfois les
   // fichiers annexes). La MEME liste vit dans registry.json (lu par
-  // l'application) : un test pytest verifie qu'elles restent IDENTIQUES.
+  // l'application) : un test pytest vérifie qu'elles restent IDENTIQUES.
   /* REGISTRY-START */
   var REGISTRY = {
     "version": 1,
@@ -120,6 +120,86 @@
         "description": "Outils réseau : ping, DNS, IP info, port scan, HTTP check, traceroute (stdlib + API gratuites)",
         "auteur": "B4Z1Z",
         "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/network.py",
+        "dangereux": false
+      },
+      {
+        "nom": "crypto",
+        "fichier": "crypto.py",
+        "description": "Prix crypto en temps réel via CoinGecko (gratuit, sans clé API)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/crypto.py",
+        "dangereux": false
+      },
+      {
+        "nom": "file_ops",
+        "fichier": "file_ops.py",
+        "description": "Opérations fichiers : lire, écrire, lister, copier, déplacer, supprimer, chercher",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/file_ops.py",
+        "dangereux": true
+      },
+      {
+        "nom": "git",
+        "fichier": "git.py",
+        "description": "Helper Git (status, diff, log, commit, push, branch, etc.)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/git.py",
+        "dangereux": true
+      },
+      {
+        "nom": "git_helper",
+        "fichier": "git_helper.py",
+        "description": "Commandes Git rapides : status, diff, log, commit, push, branch",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/git_helper.py",
+        "dangereux": true
+      },
+      {
+        "nom": "notes",
+        "fichier": "notes.py",
+        "description": "Gestionnaire de notes : ajouter, lister, chercher, supprimer (JSON local)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/notes.py",
+        "dangereux": false
+      },
+      {
+        "nom": "password",
+        "fichier": "password.py",
+        "description": "Générateur de mots de passe sécurisés et passphrases",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/password.py",
+        "dangereux": false
+      },
+      {
+        "nom": "qrcode",
+        "fichier": "qrcode.py",
+        "description": "Générateur de QR codes (texte, URL, WiFi, vCard, email, SMS, tel)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/qrcode.py",
+        "dangereux": false
+      },
+      {
+        "nom": "sysinfo",
+        "fichier": "sysinfo.py",
+        "description": "Informations système détaillées (CPU, RAM, disque, réseau, processus) via psutil",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/sysinfo.py",
+        "dangereux": false
+      },
+      {
+        "nom": "translate",
+        "fichier": "translate.py",
+        "description": "Traducteur via LibreTranslate (gratuit, sans clé API)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/translate.py",
+        "dangereux": false
+      },
+      {
+        "nom": "web_search",
+        "fichier": "web_search.py",
+        "description": "Recherche web via DuckDuckGo (HTML scraping, sans clé API)",
+        "auteur": "B4Z1Z",
+        "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/web_search.py",
         "dangereux": false
       }
     ]
