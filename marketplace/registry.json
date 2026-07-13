@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "site": "https://baziz-plugins.vercel.app",
+  "site": "https://retroai-agent.vercel.app",
   "plugins": [
     {
       "nom": "get_weather",
@@ -32,6 +32,14 @@
       "description": "Infos système : OS, CPU, Python, espace disque (stdlib uniquement)",
       "auteur": "B4Z1Z",
       "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/system_info.py",
+      "dangereux": false
+    },
+    {
+      "nom": "network_tool",
+      "fichier": "network.py",
+      "description": "Outils réseau : ping, DNS, IP info, port scan, HTTP check, traceroute (stdlib + API gratuites)",
+      "auteur": "B4Z1Z",
+      "url": "https://raw.githubusercontent.com/b4z1z/retroai-agent/main/marketplace/plugins/network.py",
       "dangereux": false
     }
   ]
