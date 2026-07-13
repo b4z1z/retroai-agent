@@ -1,7 +1,0 @@
-# Vercel ignore - permet de déployer le dossier plugins/
-# (sans ça, .gitignore bloque tout plugins/ sauf 3 fichiers)
-
-!plugins/
-!plugins/*
-!plugins/__pycache__/
-!plugins/*.pyc
