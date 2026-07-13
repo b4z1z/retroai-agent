@@ -2629,3 +2629,14 @@ GitHub repond avec les 4 plugins (l'app n'a AUCUN probleme). Explications :
 instance BAZIZ.IA ouverte avec l'ancien code (-> /restart) OU le site Vercel
 pas encore deploye (action utilisateur, guide marketplace/README.md).
 ETAT : TERMINE, pushe (bf4822a).
+
+SUITE — mystere du "marketplace vide" RESOLU : l'utilisateur ouvrait
+marketplace/index.html en DOUBLE-CLIC (file://). Or les navigateurs BLOQUENT
+fetch() en file:// (CORS) -> le catalogue ne se chargeait jamais, page vide.
+Les <script src>, eux, marchent en file://. FIX : le catalogue passe par
+registry.js (window.REGISTRY = <copie exacte du JSON>) charge en balise
+script, avec fetch(registry.json) en secours ; test pytest garantit que
+registry.js reste la copie EXACTE de registry.json (la source de verite de
+l'app ne change pas). Procedure de publication du marketplace/README mise a
+jour (recopier dans les 2 fichiers). Verifie via serveur local : 4 plugins
+affiches. 197 -> 198 tests. Pushe (adfbbbf).
