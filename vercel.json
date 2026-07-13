@@ -1,0 +1,11 @@
+{
+  "buildCommand": "echo 'static site - no build'",
+  "outputDirectory": "plugins",
+  "framework": "none",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
