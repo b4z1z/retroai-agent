@@ -2863,3 +2863,27 @@ Pushe (29ee6d9).
    visible (distinct du rouge d'erreur=echec) : "'<nom>' requests BROAD
    ACCESS" + revoir le code AVANT (URL), confiance en l'auteur, confirmation
    y/n a CHAQUE run. +1 test. 211 -> 212. Pushe (01057d7).
+
+----------------------------------------------------------------
+[2026-07-14] FEATURE /stats : tableau de bord local
+----------------------------------------------------------------
+stats.py (NOUVEAU) : tout est DERIVE des fichiers deja presents (sessions/
+*.json, memoire.json, plugins/) — AUCUNE telemetrie, aucun nouveau suivi,
+rien ne quitte la machine. calculer() parcourt les sessions et agrege :
+conversations, messages (dont ceux de l'utilisateur), APPELS D'OUTILS avec
+Counter par outil (les tool_calls sont deja dans l'historique sauvegarde !),
+volume de texte -> tokens estimes (~4 chars/token, meme regle que /btw),
+periode d'activite (1re creation -> derniere maj), conversation la plus
+longue. + souvenirs (memoire) et plugins actifs/desactives.
+PIEGE GERE : un message multimodal a un contenu en LISTE de blocs -> on ne
+compte que les blocs "text" (sinon le base64 d'une image exploserait le
+compteur de tokens). Test dedie.
+ui.afficher_stats : panneau avec CLASSEMENT DES OUTILS en barres (barre
+proportionnelle au max). Declare dans COMMANDES + AIDE_LOGICIEL.
+REEL (donnees de l'utilisateur) : 18 conversations, 697 messages, 297 appels
+d'outils, ~266k tokens, 16 plugins ; top : run_shell_command 106, read_file
+86, write_file 64, list_directory 41.
+TESTS : test_stats.py (4 : agregation complete + top outils + periode,
+multimodal, memoire/plugins comptes (_prive.py ignore), zero session).
+212 -> 216, tous OK.
+ETAT : TERMINE ET VERIFIE EN REEL.

@@ -33,6 +33,7 @@ from . import sessions
 from . import tuto
 from . import plugins
 from . import memoire
+from . import stats
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -157,6 +158,10 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/memory":
             _menu_memoire()
+            continue
+        if saisie == "/stats":
+            resume = stats.calculer()
+            ui.afficher_stats(resume, stats.top_outils(resume))
             continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :

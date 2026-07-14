@@ -984,6 +984,70 @@ def afficher_jetons(tour: dict, session: dict) -> None:
               "not tokens.")
 
 
+def afficher_stats(resume: dict, top: list) -> None:
+    """
+    Commande /stats : tableau de bord local (aucune telemetrie — tout est
+    derive des fichiers deja sur la machine).
+    """
+    def _n(valeur) -> str:
+        return f"{valeur:,}".replace(",", " ")
+
+    actifs, inactifs = resume["plugins"]
+    jours = ""
+    if resume["premiere"] and resume["derniere"]:
+        jours = f"{resume['premiere'][:10]} → {resume['derniere'][:10]}"
+
+    if RICH_DISPO:
+        t = Text()
+        t.append("📊 Your BAZIZ.IA stats\n\n", style=f"bold {ACCENT}")
+        t.append("Conversations : ", style=DIM)
+        t.append(f"{_n(resume['sessions'])}", style="bold")
+        t.append(f"   ({_n(resume['messages'])} messages, "
+                 f"{_n(resume['messages_utilisateur'])} from you)\n",
+                 style=DIM)
+        t.append("Tool calls    : ", style=DIM)
+        t.append(f"{_n(resume['appels_outils'])}\n", style="bold")
+        t.append("Volume        : ", style=DIM)
+        t.append(f"~{_n(resume['tokens_estimes'])} tokens", style="bold")
+        t.append("  (estimated from saved text)\n", style=DIM)
+        t.append("Extensions    : ", style=DIM)
+        t.append(f"{actifs} plugin(s)", style="bold")
+        if inactifs:
+            t.append(f"  ({inactifs} disabled)", style=DIM)
+        t.append("\n")
+        t.append("Memory        : ", style=DIM)
+        t.append(f"{resume['souvenirs']} fact(s) remembered\n", style="bold")
+        if jours:
+            t.append("Active since  : ", style=DIM)
+            t.append(f"{jours}\n", style="bold")
+        if resume["plus_longue"]:
+            titre, nb = resume["plus_longue"]
+            t.append("Longest chat  : ", style=DIM)
+            t.append(f"{titre[:38]} ({nb} msg)\n", style="bold")
+
+        if top:
+            t.append("\nMost used tools\n", style=f"bold {DIM}")
+            maximum = top[0][1] or 1
+            for nom, appels in top:
+                barre = "█" * max(1, round(appels / maximum * 18))
+                t.append(f"  {nom:<18}", style="default")
+                t.append(f"{barre} ", style=ACCENT)
+                t.append(f"{_n(appels)}\n", style=DIM)
+        t.append("\nAll local — nothing is ever sent anywhere.", style=DIM)
+        _console.print()
+        _console.print(Panel(t, border_style=DIM, padding=(1, 4), expand=True))
+    else:
+        print("\n[stats]")
+        print(f"  Conversations : {resume['sessions']} "
+              f"({resume['messages']} messages)")
+        print(f"  Tool calls    : {resume['appels_outils']}")
+        print(f"  Volume        : ~{resume['tokens_estimes']} tokens (est.)")
+        print(f"  Extensions    : {actifs} plugin(s)")
+        print(f"  Memory        : {resume['souvenirs']} fact(s)")
+        for nom, appels in top:
+            print(f"    {nom}: {appels}")
+
+
 def afficher_plugins(liste: list, problemes: list) -> None:
     """
     Commande /plugins : liste les outils ajoutes par le dossier plugins/
@@ -1143,6 +1207,7 @@ COMMANDES = [
     ("/model", "Pick the CHAT model (applied instantly, kept until changed)"),
     ("/plugins", "Plugin hub: see / install (marketplace) / disable / delete"),
     ("/memory", "See or forget what the agent remembers across sessions"),
+    ("/stats", "Local dashboard: conversations, tool calls, tokens, plugins"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),
