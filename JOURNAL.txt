@@ -2845,3 +2845,10 @@ changement x2 -> x3 -> "UPDATED - multiplication factor changed from 2 to
 TESTS : +1 (comparer_au_marketplace : absent/identique/different/inconnu).
 210 -> 211, tous OK.
 ETAT : TERMINE ET VALIDE EN REEL.
+SUITE (retour utilisateur "n'affiche pas les plugins deja publies") : la
+LISTE de publication est FILTREE en amont — les plugins publies a
+l'identique sont MASQUES (au lieu d'etre selectionnables pour rien), ceux
+dont le contenu a change sont marques "⬆ update", et si tout est a jour :
+"All your active plugins are already published and up to date 🎉" sans
+ouvrir de liste. La cascade contenu->IA reste en aval comme filet.
+Pushe (29ee6d9).
