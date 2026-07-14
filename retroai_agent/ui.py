@@ -480,6 +480,27 @@ def info(texte: str) -> None:
         print(f"  {texte}")
 
 
+def avertissement(titre: str, texte: str) -> None:
+    """
+    Bloc d'AVERTISSEMENT bien visible (encadre ambre) — pour les moments qui
+    demandent l'attention de l'utilisateur, ex. installer un plugin a acces
+    etendu (telechargement de code executable). Plus fort que info(), sans le
+    rouge d'erreur() qui signalerait un echec.
+    """
+    ambre = "#ffb224"
+    if RICH_DISPO:
+        contenu = Text()
+        contenu.append(f"⚠  {titre}\n\n", style=f"bold {ambre}")
+        contenu.append(texte, style="default")
+        _console.print()
+        _console.print(Panel(contenu, border_style=ambre, padding=(1, 3),
+                             expand=True))
+    else:
+        print(f"\n  /!\\ {titre}")
+        for ligne in texte.split("\n"):
+            print(f"      {ligne}")
+
+
 def en_developpement(nom: str) -> None:
     """Signale qu'une fonctionnalite est en cours de developpement (a venir)."""
     if RICH_DISPO:

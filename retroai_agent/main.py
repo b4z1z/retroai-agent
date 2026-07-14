@@ -721,11 +721,17 @@ def _action_plugins(action: str, actifs: list, inactifs: list,
         # precautions — c'est la qu'un avertissement est utile, pas un badge
         # anxiogene sur chaque carte.
         if entree.get("dangereux"):
-            ui.info(
-                "🔐 Heads-up: this plugin has BROAD ACCESS (files, system or "
-                "sensitive data). Review its code first (marketplace → 'Voir "
-                "le code'). Once installed, it will still ask a y/n "
-                "confirmation before EACH run."
+            ui.avertissement(
+                f"'{entree['nom']}' requests BROAD ACCESS",
+                "This plugin can touch your files, your system or sensitive "
+                "data.\n"
+                "• Review its code BEFORE installing: open the URL below in a "
+                "browser.\n"
+                "• Only install it if you trust the author "
+                f"({entree.get('auteur', '?')}).\n"
+                "• Even once installed, it will ask a y/n confirmation before "
+                "EACH run.\n"
+                f"Source: {entree['url']}"
             )
         # Telecharger du CODE que l'agent pourra executer merite une
         # confirmation explicite, avec la source affichee.

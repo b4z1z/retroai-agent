@@ -188,6 +188,17 @@ def test_publier_copie_registre_et_site(tmp_path):
         plugins.activer(str(tmp_path / "inexistant"))
 
 
+def test_avertissement_acces_etendu(capsys):
+    """Un plugin a acces etendu doit declencher un AVERTISSEMENT visible
+    (titre + revue du code + confirmation a chaque run), pas un simple info."""
+    from retroai_agent import ui
+    ui.avertissement("'git' requests BROAD ACCESS",
+                     "Review its code before installing.\nSource: https://x")
+    sortie = capsys.readouterr().out
+    assert "BROAD ACCESS" in sortie
+    assert "Review its code" in sortie
+
+
 def test_comparer_au_marketplace(tmp_path):
     """Anti-doublon de publication : absent -> publier ; identique -> inutile
     de republier ; contenu different -> mise a jour potentielle (l'IA
