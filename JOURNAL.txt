@@ -2806,3 +2806,9 @@ TESTS : +2 (Esc sans repli numerote sur /model ; _choisir distingue
 ANNULE/indisponible). 208 -> 210, tous OK.
 ETAT : TERMINE. (/restart puis /plugins : Esc dans une sous-liste ramene au
 menu.)
+SUITE — effet de bord de la boucle repere par l'utilisateur : "See installed
+plugins" etait RECOUVERT par le menu qui revenait aussitot. FIX :
+ui.attendre_touche() (NOUVEAU) — attend N'IMPORTE QUELLE touche (msvcrt.getch
+sous Windows, tty raw ailleurs, repli Entree, jamais bloquant hors TTY,
+verifie) — appelee apres l'affichage du panneau : "Press any key to go back
+to the menu…". Pushe (f396b00).
