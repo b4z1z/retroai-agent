@@ -2852,3 +2852,14 @@ dont le contenu a change sont marques "⬆ update", et si tout est a jour :
 "All your active plugins are already published and up to date 🎉" sans
 ouvrir de liste. La cascade contenu->IA reste en aval comme filet.
 Pushe (29ee6d9).
+
+----------------------------------------------------------------
+[2026-07-14] Plugins 🔐 : alignement liste + AVERTISSEMENT visible au download
+----------------------------------------------------------------
+1) ALIGNEMENT : le cadenas (emoji 2 cellules) inserre au milieu decalait
+   "(installed)". Colonnes fixes + cadenas rejete EN FIN DE LIGNE. (2dd9b5d)
+2) AVERTISSEMENT au telechargement d'un plugin dangereux : existait en
+   ui.info (gris). NOUVEAU ui.avertissement(titre, texte) = encadre AMBRE
+   visible (distinct du rouge d'erreur=echec) : "'<nom>' requests BROAD
+   ACCESS" + revoir le code AVANT (URL), confiance en l'auteur, confirmation
+   y/n a CHAQUE run. +1 test. 211 -> 212. Pushe (01057d7).
