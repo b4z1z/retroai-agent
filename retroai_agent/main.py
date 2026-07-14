@@ -595,10 +595,24 @@ def _action_plugins(action: str, actifs: list, inactifs: list,
         if not actifs:
             ui.info("No active plugin to publish.")
             return True
+        # La liste ne montre QUE ce qui vaut la peine d'etre publie :
+        # les plugins deja en ligne a l'identique sont MASQUES ; ceux dont
+        # le contenu a change apparaissent marques "(update)".
+        candidats = []
+        for p in actifs:
+            etat = plugins.comparer_au_marketplace(p["nom"])
+            if etat == "identique":
+                continue
+            marqueur = "  ⬆ update" if etat == "different" else ""
+            candidats.append(
+                (p["nom"], f"{p['nom']} — {p['description'][:48]}{marqueur}"))
+        if not candidats:
+            ui.info("All your active plugins are already published and up "
+                    "to date — nothing to publish. 🎉")
+            return True
         fichier_ou_nom = _choisir(
-            "Publish", "Pick a plugin to publish to the community "
-            "marketplace:", [(p["nom"], f"{p['nom']} — {p['description'][:52]}")
-                             for p in actifs])
+            "Publish", "Pick a plugin to publish (already-published & "
+            "identical ones are hidden):", candidats)
         if fichier_ou_nom is None:
             return False
         # ANTI-DOUBLON : nom deja publie ? -> comparer les CONTENUS ; si
