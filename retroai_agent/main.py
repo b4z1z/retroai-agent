@@ -515,17 +515,23 @@ def _menu_plugins() -> None:
         )
         if action is None:
             return          # Esc au menu principal -> on quitte le hub
-        _action_plugins(action, actifs, inactifs)
+        # PAUSE GENERALISEE (retour utilisateur "same thing for all the
+        # menu") : si l'action a AFFICHE quelque chose (True), on attend une
+        # touche avant que la boucle ne recouvre l'ecran avec le menu ;
+        # une annulation silencieuse (False) revient au menu directement.
+        if _action_plugins(action, actifs, inactifs):
+            ui.attendre_touche("Press any key to go back to the menu…")
 
 
-def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
-    """Execute UNE action du hub /plugins ; un return = retour au menu."""
+def _action_plugins(action: str, actifs: list, inactifs: list) -> bool:
+    """
+    Execute UNE action du hub /plugins. Retourne True si quelque chose a ete
+    AFFICHE (panneau, succes, erreur, guide) -> la boucle marquera une pause ;
+    False pour une annulation silencieuse (Esc, refus) -> retour direct.
+    """
     if action == "voir":
         ui.afficher_plugins(plugins.liste(), plugins.erreurs())
-        # Sans cette attente, la boucle du hub reafficherait le menu
-        # PAR-DESSUS le panneau avant que l'utilisateur ait pu le lire.
-        ui.attendre_touche("Press any key to go back to the menu…")
-        return
+        return True
 
     if action == "site":
         # Voir le marketplace = OUVRIR LE SITE, point. (Pas de liste dans le
@@ -535,7 +541,7 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
         import webbrowser
         webbrowser.open(plugins.URL_SITE)
         ui.succes(f"Opened {plugins.URL_SITE} in your browser.")
-        return
+        return False
 
     if action == "creer":
         ui.info(
@@ -547,28 +553,28 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
             "  2. Manual — drop a .py file in the plugins/ folder "
             "(contract: plugins/README.md), then reopen /plugins."
         )
-        return
+        return True
 
     if action == "publier":
         if not actifs:
             ui.info("No active plugin to publish.")
-            return
+            return True
         fichier_ou_nom = _choisir(
             "Publish", "Pick a plugin to publish to the community "
             "marketplace:", [(p["nom"], f"{p['nom']} — {p['description'][:52]}")
                              for p in actifs])
         if fichier_ou_nom is None:
-            return
+            return False
         try:
             auteur = ui.demander_texte(
                 "Author name shown on the site (Enter = B4Z1Z):"
             ).strip() or "B4Z1Z"
         except (EOFError, KeyboardInterrupt):
-            return
+            return False
         probleme = plugins.publier(fichier_ou_nom, auteur)
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         ui.succes(
             f"'{fichier_ou_nom}' added to the local marketplace files "
             "(registry + site synced)."
@@ -589,18 +595,18 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
                 "Once approved and merged, the site auto-deploys and your "
                 "plugin becomes installable by everyone."
             )
-            return
+            return True
         # Le deploiement = un simple push : Vercel rebuild automatiquement.
         try:
             ok = ui.demander_texte(
                 "Commit & push now? Vercel will auto-deploy the site (y/n):"
             ).strip().lower()
         except (EOFError, KeyboardInterrupt):
-            return
+            return False
         if ok not in ("y", "yes", "o", "oui"):
             ui.info("Not pushed — the plugin will go online with your next "
                     "git push.")
-            return
+            return True
         commande = (
             'git add marketplace && git commit -m "marketplace: publish '
             + fichier_ou_nom + '" && git push'
@@ -611,17 +617,17 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
                       f"online at {plugins.URL_SITE} in ~30 seconds.")
         else:
             ui.erreur("git push failed — check your git setup and retry.")
-        return
+        return True
 
     if action == "installer":
         ui.info("Fetching the community catalog…")
         entrees, probleme = plugins.catalogue()
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         if not entrees:
             ui.info("The marketplace is empty for now.")
-            return
+            return True
         deja = {p["nom"] for p in plugins.liste()}
         options = [
             (i, f"{e['nom']:<16} — {e.get('description', '')[:48]}"
@@ -632,7 +638,7 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
         idx = _choisir("Marketplace",
                        "Pick a plugin to install (Esc to cancel):", options)
         if idx is None:
-            return
+            return False
         entree = entrees[idx]
         # ACCES ETENDU (fichiers, systeme, donnees sensibles...) : on previent
         # AVANT le telechargement pour que l'utilisateur prenne ses
@@ -652,78 +658,78 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
                 f"Install '{entree['nom']}' from {entree['url']} ? (y/n):"
             ).strip().lower()
         except (EOFError, KeyboardInterrupt):
-            return
+            return False
         if ok not in ("y", "yes", "o", "oui"):
             ui.info("Cancelled.")
-            return
+            return False
         probleme = plugins.installer(entree)
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         plugins.activer()
         ui.succes(f"Plugin '{entree['nom']}' installed and ACTIVE right now "
                   "(no restart needed).")
-        return
+        return True
 
     if action == "desactiver":
         if not actifs:
             ui.info("No active plugin.")
-            return
+            return True
         fichier = _choisir("Disable", "Pick a plugin to disable:",
                            [(p["fichier"], f"{p['nom']} — {p['fichier']}")
                             for p in actifs])
         if fichier is None:
-            return
+            return False
         probleme = plugins.desactiver_fichier(fichier)
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         plugins.activer()
         ui.succes("Disabled (kept on disk — re-enable anytime via /plugins).")
-        return
+        return True
 
     if action == "reactiver":
         if not inactifs:
             ui.info("No disabled plugin.")
-            return
+            return True
         fichier = _choisir("Enable", "Pick a plugin to re-enable:",
                            [(f, os.path.basename(f)) for f in inactifs])
         if fichier is None:
-            return
+            return False
         probleme = plugins.reactiver_fichier(fichier)
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         plugins.activer()
         ui.succes("Enabled and ACTIVE right now (no restart needed).")
-        return
+        return True
 
     if action == "supprimer":
         tout = [(p["fichier"], f"{p['nom']} — {p['fichier']}") for p in actifs]
         tout += [(f, f"(disabled) {os.path.basename(f)}") for f in inactifs]
         if not tout:
             ui.info("Nothing to delete.")
-            return
+            return True
         fichier = _choisir("Delete", "Pick a plugin file to DELETE forever:",
                            tout)
         if fichier is None:
-            return
+            return False
         try:
             ok = ui.demander_texte(
                 f"Really delete {fichier}? This cannot be undone (y/n):"
             ).strip().lower()
         except (EOFError, KeyboardInterrupt):
-            return
+            return False
         if ok not in ("y", "yes", "o", "oui"):
             ui.info("Cancelled.")
-            return
+            return False
         probleme = plugins.supprimer_fichier(fichier)
         if probleme:
             ui.erreur(probleme)
-            return
+            return True
         plugins.activer()
         ui.succes("Deleted.")
-        return
+        return True
 
 
 # Modeles de CHAT proposes dans le menu /model : (id NVIDIA, description).
