@@ -2772,3 +2772,9 @@ ce vieil artefact bac-a-sable des qu'on lancait les tests hors du dossier).
 208 tests OK.
 ETAT : TERMINE. (/restart puis /think ou /plugins pour sentir le nouveau
 selecteur — Enter valide direct.)
+SUITE (retour utilisateur "no fetch, open the website / sinon depuis le
+dossier") : /plugins > "See the marketplace" n'affiche RIEN dans le terminal.
+Detection rapide de connectivite (socket TCP 443 vers l'hote du site, 3s,
+pas de fetch de contenu) : EN LIGNE -> ouvre le site Vercel ; HORS LIGNE ->
+ouvre la COPIE LOCALE marketplace/index.html (autonome depuis l'integration
+du catalogue inline : marche sans reseau). Pushe (f8f3b45).
