@@ -34,6 +34,7 @@ from . import tuto
 from . import plugins
 from . import memoire
 from . import stats
+from . import corbeille
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -162,6 +163,12 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
         if saisie == "/stats":
             resume = stats.calculer()
             ui.afficher_stats(resume, stats.top_outils(resume))
+            continue
+        if saisie == "/undo":
+            _annuler_ecriture()
+            continue
+        if saisie == "/init":
+            _initialiser_projet(agent)
             continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :
@@ -430,6 +437,80 @@ def _menu_image(agent: AgentLoop) -> None:
         return
 
     ui.erreur(f"Unknown choice: {choix}")
+
+
+def _annuler_ecriture() -> None:
+    """
+    Commande /undo : restaure un fichier ecrase (ou supprime un fichier cree)
+    par l'agent. Chaque write_file sauvegarde l'etat precedent au prealable
+    (corbeille.py) — /undo est donc un VRAI filet, meme en mode auto-edit.
+    """
+    entrees = corbeille.lister()
+    if not entrees:
+        ui.info("Nothing to undo — I haven't written any file yet.")
+        return
+    ui.afficher_sauvegardes(entrees[:10])
+    try:
+        reponse = ui.demander_texte(
+            "Undo which one? (Enter = the most recent, number = pick, "
+            "Esc/'n' = cancel):"
+        ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        ui.info("\nCancelled.")
+        return
+    if reponse in ("n", "no", "non"):
+        return
+    index = int(reponse) if reponse.isdigit() else 0
+    if index >= len(entrees):
+        ui.erreur(f"No backup number {index}.")
+        return
+    message = corbeille.restaurer(index)
+    if message is None:
+        ui.erreur("Could not undo (backup missing).")
+    elif message.startswith("Error"):
+        ui.erreur(message)
+    else:
+        ui.succes(message + "  (/undo again to go further back)")
+
+
+# Fichier de contexte projet, relu au demarrage de chaque conversation.
+FICHIER_PROJET = "BAZIZ.md"
+
+
+def _initialiser_projet(agent: AgentLoop) -> None:
+    """
+    Commande /init : l'agent EXPLORE le dossier courant et ecrit BAZIZ.md
+    (stack, structure, conventions, commandes utiles). Ce fichier est ensuite
+    relu au demarrage de chaque conversation -> l'agent connait le projet
+    sans qu'on lui reexplique.
+    """
+    if os.path.exists(FICHIER_PROJET):
+        try:
+            ok = ui.demander_texte(
+                f"{FICHIER_PROJET} already exists — regenerate it? (y/n):"
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if ok not in ("y", "yes", "o", "oui"):
+            ui.info("Kept the existing file. (Edit it by hand anytime.)")
+            return
+    ui.info("Exploring the project… I'll write what I learn to "
+            f"{FICHIER_PROJET} (re-read at every new conversation).")
+    consigne = (
+        "Explore the CURRENT project folder and write a concise "
+        f"{FICHIER_PROJET} file at its root. Steps: list the directory, read "
+        "the key files you find (README, package.json / pyproject.toml / "
+        "requirements, main entry points, config), then write "
+        f"{FICHIER_PROJET} with these sections:\n"
+        "# Project\n(one paragraph: what this project does)\n"
+        "## Stack\n(languages, frameworks, main dependencies)\n"
+        "## Structure\n(the important folders/files and their role)\n"
+        "## Commands\n(how to install, run, test — real commands you found)\n"
+        "## Conventions\n(naming, style, anything a newcomer must respect)\n"
+        "Be factual: only what you actually SAW in the files. Keep it under "
+        "60 lines. Write the file with write_file, then give a 2-line summary."
+    )
+    _traiter_reponse(agent, saisie=consigne)
 
 
 def _menu_memoire() -> None:

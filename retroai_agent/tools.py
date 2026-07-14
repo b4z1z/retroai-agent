@@ -27,6 +27,7 @@ from .config import Config
 from . import safety
 from . import ui
 from . import modes
+from . import corbeille
 
 
 def _encodage_console() -> str:
@@ -211,23 +212,45 @@ def _outil_write_file(args: dict, config: Config) -> str:
             "Present a step-by-step plan and wait for the user to approve."
         )
 
-    # Apercu (genereux) pour que l'utilisateur VOIE le code ecrit.
-    LIMITE_APERCU = 1500
-    apercu = content[:LIMITE_APERCU] + (
-        f"\n… (+{len(content) - LIMITE_APERCU} more characters)"
-        if len(content) > LIMITE_APERCU else ""
-    )
-    details = (
-        f"File:    {path}\n"
-        f"Size:    {len(content)} characters, {content.count(chr(10)) + 1} lines\n"
-        f"Preview:\n{apercu}"
-    )
+    # Le fichier existe deja -> on montre un DIFF (ce qui change vraiment)
+    # plutot qu'un simple apercu du nouveau contenu : l'utilisateur approuve
+    # en VOYANT les modifications, pas en devinant. Nouveau fichier -> apercu.
+    existant = None
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                existant = f.read()
+        except OSError:
+            existant = None
+
+    if existant is not None:
+        if existant == content:
+            return f"No change: {path} already has exactly this content."
+        details = (
+            f"File:    {path}  (existing — showing what CHANGES)\n"
+            f"{ui.diff_texte(existant, content)}"
+        )
+    else:
+        LIMITE_APERCU = 1500
+        apercu = content[:LIMITE_APERCU] + (
+            f"\n… (+{len(content) - LIMITE_APERCU} more characters)"
+            if len(content) > LIMITE_APERCU else ""
+        )
+        details = (
+            f"File:    {path}  (new file)\n"
+            f"Size:    {len(content)} characters, "
+            f"{content.count(chr(10)) + 1} lines\n"
+            f"Preview:\n{apercu}"
+        )
 
     # Modes auto-edit / auto-all : ecriture auto-approuvee, sinon confirmation.
     if modes.auto_edits():
         ui.info(f"(auto-accept edits — writing {path} without confirmation)")
     elif not safety.demander_confirmation("Write a file", details, categorie="edit"):
         return "Action cancelled by the user (write_file refused)."
+
+    # FILET /undo : on sauve l'etat AVANT d'ecraser (ou on note la creation).
+    corbeille.sauvegarder(path)
 
     try:
         # Cree le(s) dossier(s) parent(s) manquants (meme niveau de risque que

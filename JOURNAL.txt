@@ -2887,3 +2887,36 @@ TESTS : test_stats.py (4 : agregation complete + top outils + periode,
 multimodal, memoire/plugins comptes (_prive.py ignore), zero session).
 212 -> 216, tous OK.
 ETAT : TERMINE ET VERIFIE EN REEL.
+
+----------------------------------------------------------------
+[2026-07-14] TRIO : /undo (corbeille), DIFF avant ecriture, /init (BAZIZ.md)
+----------------------------------------------------------------
+Trois features qui s'articulent : le DIFF montre ce qui va changer, /undo
+repare si on s'est trompe, /init donne le contexte projet.
+1) corbeille.py (NOUVEAU) : AVANT chaque write_file, l'etat precedent est
+   copie dans .baziz_backups/ (gitignore) + index JSON, plafonne a 30 (FIFO).
+   Un fichier qui n'existait pas est note "creation" -> l'annuler = le
+   SUPPRIMER. restaurer(index) consomme l'entree -> /undo REPETABLE en
+   cascade (remonte le temps ecriture par ecriture). sauvegarder() ne leve
+   JAMAIS : une sauvegarde ratee ne doit pas empecher l'ecriture demandee.
+   /undo (main._annuler_ecriture) : liste les 10 dernieres ecritures
+   (fichier, cree/ecrase, date), Enter = la plus recente, ou un numero.
+   FILET REEL meme en auto-edit (la ou on ne confirme rien).
+2) DIFF (ui.diff_texte + tools._outil_write_file) : si le fichier EXISTE, la
+   confirmation montre desormais un diff unifie (+N/-M lignes, contexte 2
+   lignes, tronque a 60 lignes) au lieu d'un apercu du nouveau contenu ->
+   on approuve en VOYANT ce qui change. Nouveau fichier -> apercu comme
+   avant. BONUS : contenu identique -> "No change", aucune ecriture, aucune
+   sauvegarde (evite de polluer /undo pour rien).
+3) /init (main._initialiser_projet + agent_loop._lire_contexte_projet) :
+   l'agent explore le dossier courant et ecrit BAZIZ.md (Project/Stack/
+   Structure/Commands/Conventions, <60 lignes, uniquement ce qu'il a VU).
+   Ce fichier est ensuite INJECTE dans le message systeme de CHAQUE nouvelle
+   conversation (plafond 8000 chars : il part dans chaque appel API) ->
+   l'agent connait le projet sans qu'on reexplique. Regeneration confirmee
+   si le fichier existe deja ; editable a la main.
+COMMANDES + AIDE_LOGICIEL a jour. TESTS : test_undo_diff_init.py (10 :
+restauration/suppression/cascade, write_file alimente la corbeille, "No
+change", diff +/- et troncature, BAZIZ.md injecte ou non, gitignore).
+216 -> 226, tous OK.
+ETAT : TERMINE.

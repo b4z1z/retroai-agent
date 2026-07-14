@@ -984,6 +984,51 @@ def afficher_jetons(tour: dict, session: dict) -> None:
               "not tokens.")
 
 
+def diff_texte(avant: str, apres: str, max_lignes: int = 60) -> str:
+    """
+    Diff unifie et LISIBLE entre deux versions d'un fichier : lignes '+'
+    (ajoutees) et '-' (supprimees) avec un peu de contexte, plus un resume
+    ("N lignes ajoutees, M supprimees"). Sert a la confirmation d'ecriture :
+    l'utilisateur approuve en VOYANT ce qui change.
+    """
+    import difflib
+
+    lignes = list(difflib.unified_diff(
+        avant.splitlines(), apres.splitlines(),
+        fromfile="before", tofile="after", lineterm="", n=2,
+    ))
+    ajoutees = sum(1 for l in lignes
+                   if l.startswith("+") and not l.startswith("+++"))
+    retirees = sum(1 for l in lignes
+                   if l.startswith("-") and not l.startswith("---"))
+    corps = lignes[2:]                       # saute les en-tetes ---/+++
+    if len(corps) > max_lignes:
+        reste = len(corps) - max_lignes
+        corps = corps[:max_lignes] + [f"… (+{reste} more diff lines)"]
+    resume = f"Changes: +{ajoutees} line(s), -{retirees} line(s)"
+    return resume + "\n" + "\n".join(corps)
+
+
+def afficher_sauvegardes(entrees: list) -> None:
+    """Liste des sauvegardes restaurables (/undo)."""
+    if RICH_DISPO:
+        t = Text()
+        t.append("↩ Undo — recent file writes\n\n", style=f"bold {ACCENT}")
+        for i, e in enumerate(entrees):
+            genre = "created" if e.get("creation") else "overwritten"
+            t.append(f"  {i:2}. ", style=DIM)
+            t.append(f"{os.path.basename(e['chemin'])}", style="bold")
+            t.append(f"  ({genre}, {e.get('date', '?')})\n", style=DIM)
+        t.append("\n0 = most recent write.", style=DIM)
+        _console.print()
+        _console.print(Panel(t, border_style=DIM, padding=(1, 3), expand=True))
+    else:
+        print("\n[undo] recent file writes:")
+        for i, e in enumerate(entrees):
+            genre = "created" if e.get("creation") else "overwritten"
+            print(f"  {i:2}. {os.path.basename(e['chemin'])} ({genre})")
+
+
 def afficher_stats(resume: dict, top: list) -> None:
     """
     Commande /stats : tableau de bord local (aucune telemetrie — tout est
@@ -1208,6 +1253,8 @@ COMMANDES = [
     ("/plugins", "Plugin hub: see / install (marketplace) / disable / delete"),
     ("/memory", "See or forget what the agent remembers across sessions"),
     ("/stats", "Local dashboard: conversations, tool calls, tokens, plugins"),
+    ("/undo", "Undo my last file write (restore the previous version)"),
+    ("/init", "Explore this project and write BAZIZ.md (project context)"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),

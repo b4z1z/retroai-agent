@@ -172,6 +172,16 @@ AIDE_LOGICIEL = (
     "Pull Request, which emails the owner to review and approve) ; "
     "disable / re-enable ; delete. All changes apply immediately. The "
     "marketplace site is at https://retroai-agent.vercel.app\n"
+    "- /undo : undoes the LAST file I wrote — restores the previous "
+    "version (or deletes the file if I had just created it). Every "
+    "write_file backs up the previous state first, so this is a real "
+    "safety net, even in auto-accept-edits mode. Repeat /undo to go "
+    "further back.\n"
+    "- /init : I explore the CURRENT project folder and write BAZIZ.md "
+    "(what the project does, stack, structure, commands, conventions). "
+    "That file is then re-read at the start of every conversation, so I "
+    "know the project without the user re-explaining it. The user can "
+    "edit BAZIZ.md by hand anytime.\n"
     "- /stats : a LOCAL dashboard derived from the user's own files "
     "(sessions, plugins, memory): number of conversations and messages, tool "
     "calls with a ranking of the most used tools, estimated token volume, "
@@ -253,6 +263,27 @@ AIDE_LOGICIEL = (
 # tour est desormais dans la config (config.max_iterations, defaut 25).
 
 
+# Contexte projet ecrit par /init et relu a chaque nouvelle conversation.
+FICHIER_PROJET = "BAZIZ.md"
+MAX_CONTEXTE_PROJET = 8000   # plafond : il part dans CHAQUE appel API
+
+
+def _lire_contexte_projet(chemin: str = FICHIER_PROJET) -> str:
+    """Bloc BAZIZ.md a injecter dans le message systeme ("" si absent)."""
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            texte = f.read(MAX_CONTEXTE_PROJET).strip()
+    except OSError:
+        return ""
+    if not texte:
+        return ""
+    return (
+        "PROJECT CONTEXT - the user's project you are working in (from "
+        f"{FICHIER_PROJET}, written by /init). Trust it, and keep it in mind "
+        "for every answer:\n" + texte
+    )
+
+
 class AgentLoop:
     """Gere l'historique et le cycle complet d'un echange avec l'agent."""
 
@@ -315,6 +346,12 @@ class AgentLoop:
         souvenirs = memoire.texte_pour_prompt()
         if souvenirs:
             contenu = contenu + "\n\n" + souvenirs
+        # CONTEXTE PROJET (/init) : si un BAZIZ.md existe dans le dossier
+        # courant, l'agent demarre en CONNAISSANT le projet (stack, structure,
+        # commandes, conventions) — plus besoin de tout reexpliquer.
+        projet = _lire_contexte_projet()
+        if projet:
+            contenu = contenu + "\n\n" + projet
         self.historique = [{"role": "system", "content": contenu}]
         self.tour_incomplet = False
         self.session_id = None
