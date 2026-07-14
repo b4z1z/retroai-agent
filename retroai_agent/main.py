@@ -522,6 +522,9 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
     """Execute UNE action du hub /plugins ; un return = retour au menu."""
     if action == "voir":
         ui.afficher_plugins(plugins.liste(), plugins.erreurs())
+        # Sans cette attente, la boucle du hub reafficherait le menu
+        # PAR-DESSUS le panneau avant que l'utilisateur ait pu le lire.
+        ui.attendre_touche("Press any key to go back to the menu…")
         return
 
     if action == "site":

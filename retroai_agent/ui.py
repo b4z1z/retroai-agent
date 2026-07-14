@@ -783,6 +783,42 @@ def panneau_info(titre: str, lignes: list, etape: str = "") -> None:
             print(f"  {ligne}")
 
 
+def attendre_touche(invite: str = "Press any key to continue…") -> None:
+    """
+    Attend UNE touche (n'importe laquelle, sans Entree quand le terminal le
+    permet). Sert apres un affichage que la boucle d'un menu recouvrirait
+    aussitot (ex. /plugins > See installed). INCASSABLE : tout echec de
+    lecture (pas de TTY, stdin ferme...) => on continue simplement.
+    """
+    if RICH_DISPO:
+        _console.print(f"[{DIM}]{invite}[/]", end="")
+    else:
+        print(f"  {invite}", end="", flush=True)
+    try:
+        if not sys.stdin.isatty():
+            raise OSError("no tty")
+        if sys.platform.startswith("win"):
+            import msvcrt
+            msvcrt.getch()
+        else:
+            import termios
+            import tty
+            descripteur = sys.stdin.fileno()
+            avant = termios.tcgetattr(descripteur)
+            try:
+                tty.setraw(descripteur)
+                sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(descripteur, termios.TCSADRAIN, avant)
+    except Exception:
+        try:
+            input()   # repli : Entree
+        except Exception:
+            pass      # stdin illisible -> on ne bloque jamais
+    sys.stdout.write("\r" + " " * (len(invite) + 4) + "\r")
+    sys.stdout.flush()
+
+
 def pause(invite: str = "Press Enter to continue (type 'skip' to exit the tour):") -> str:
     """
     Attend une saisie (Entree ou texte) ; retourne le texte en minuscules.
