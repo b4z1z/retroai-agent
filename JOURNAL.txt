@@ -2784,3 +2784,25 @@ INGENIERIE — sans reseau, l'agent lui-meme est mort (API NVIDIA), donc un
 catalogue consultable hors-ligne ne sert a rien. Simplifie : ouvrir le site,
 point (webbrowser.open, 3 lignes). LECON (walkthrough) : toujours se
 demander QUI utilisera un repli avant de le coder. Pushe (aa74439).
+
+----------------------------------------------------------------
+[2026-07-14] FIX Esc dans les menus + navigation en boucle du hub /plugins
+----------------------------------------------------------------
+BUG REEL (screenshot utilisateur) : Esc dans la liste d'installation ->
+le REPLI NUMEROTE s'affichait (liste re-imprimee + "Choice? (1-15)") au lieu
+d'annuler. CAUSE : selecteur() renvoyait None pour DEUX cas differents —
+"utilisateur annule" ET "selecteur indisponible" — et _choisir prenait tout
+None pour "indisponible" -> repli numerote.
+FIX 1 : sentinelle ui.ANNULE (objet unique) renvoyee sur Esc/q/Ctrl+C ;
+None reste reserve a "indisponible". TOUS les appelants mis a jour
+(_choisir, /think, /sessions, /model) : Esc = annulation NETTE, le repli
+numerote ne sert QUE si prompt_toolkit/TTY manquent. (Piege evite : ANNULE
+est truthy -> les tests `if not choix` devaient devenir des `is`.)
+FIX 2 (demande "je veux revoir le menu") : _menu_plugins passe en BOUCLE —
+apres chaque action OU l'annulation d'un sous-menu, retour au MENU PRINCIPAL
+du hub (compteurs rafraichis) ; Esc au menu principal = sortie. Corps des
+actions extrait dans _action_plugins().
+TESTS : +2 (Esc sans repli numerote sur /model ; _choisir distingue
+ANNULE/indisponible). 208 -> 210, tous OK.
+ETAT : TERMINE. (/restart puis /plugins : Esc dans une sous-liste ramene au
+menu.)

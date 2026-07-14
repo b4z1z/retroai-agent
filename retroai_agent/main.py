@@ -100,7 +100,8 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
                     options,
                     defaut=courant,
                 )
-                if not choix:  # annule ou pas de selecteur -> on ne change rien
+                if choix is None or choix is ui.ANNULE:
+                    # Annule ou pas de selecteur -> on ne change rien.
                     ui.niveau_thinking(agent.config.thinking_level)
                     continue
                 agent.config.thinking_level = choix
@@ -266,7 +267,7 @@ def _gerer_sessions(agent: AgentLoop) -> None:
         options,
         defaut=agent.session_id or disponibles[0]["id"],
     )
-    if not choix:
+    if choix is None or choix is ui.ANNULE:
         return  # annule (Esc) ou selecteur indisponible -> rien ne change
     if choix == agent.session_id:
         ui.info("Already on this session.")
@@ -458,12 +459,15 @@ def _menu_memoire() -> None:
         ui.erreur(f"Unknown choice: {reponse}")
 
 
-def _choisir(titre: str, texte: str, options: list) -> str | None:
+def _choisir(titre: str, texte: str, options: list):
     """
-    Choix a fleches (ui.selecteur) avec REPLI numerote automatique quand le
-    selecteur est indisponible. options = [(valeur, libelle)]. None = annule.
+    Choix a fleches (ui.selecteur) avec REPLI numerote automatique UNIQUEMENT
+    quand le selecteur est indisponible (pas quand l'utilisateur annule !).
+    options = [(valeur, libelle)]. Retourne la valeur, ou None si annule.
     """
     choix = ui.selecteur(titre, texte, options)
+    if choix is ui.ANNULE:
+        return None      # Esc = annulation FRANCHE (pas de repli numerote)
     if choix is not None:
         return choix
     ui.info(texte)
@@ -482,33 +486,40 @@ def _choisir(titre: str, texte: str, options: list) -> str | None:
 
 def _menu_plugins() -> None:
     """
-    Commande /plugins : hub de gestion des plugins. Voir / installer depuis
-    le marketplace communautaire / desactiver / reactiver / supprimer.
+    Commande /plugins : hub de gestion des plugins, en BOUCLE : apres chaque
+    action (ou l'annulation d'un sous-menu), on REVIENT au menu principal —
+    Esc au menu principal pour sortir (retour utilisateur : annuler une
+    sous-liste doit ramener au menu, pas ejecter au prompt).
     TOUT est applique A CHAUD (plugins.activer() re-fusionne le schema) :
     aucun /restart necessaire.
     """
-    plugins.activer()  # rescan : un fichier ajoute a la main est vu direct
-    actifs = plugins.liste()
-    inactifs = plugins.lister_desactives()
+    while True:
+        plugins.activer()   # rescan : un fichier ajoute a la main est vu direct
+        actifs = plugins.liste()
+        inactifs = plugins.lister_desactives()
 
-    action = _choisir(
-        "Plugins",
-        f"{len(actifs)} active, {len(inactifs)} disabled — community "
-        f"marketplace: {plugins.URL_SITE}",
-        [
-            ("voir", f"📋 See installed plugins ({len(actifs)})"),
-            ("site", "🌐 See the marketplace (opens the website)"),
-            ("creer", "➕ Add / create a new plugin"),
-            ("installer", "🛒 Install from the community marketplace"),
-            ("publier", "📤 Publish a plugin to the marketplace (auto-deploy)"),
-            ("desactiver", f"⏸  Disable a plugin ({len(actifs)} active)"),
-            ("reactiver", f"▶  Enable a disabled plugin ({len(inactifs)} off)"),
-            ("supprimer", "🗑  Delete a plugin file"),
-        ],
-    )
-    if action is None:
-        return
+        action = _choisir(
+            "Plugins",
+            f"{len(actifs)} active, {len(inactifs)} disabled — community "
+            f"marketplace: {plugins.URL_SITE}",
+            [
+                ("voir", f"📋 See installed plugins ({len(actifs)})"),
+                ("site", "🌐 See the marketplace (opens the website)"),
+                ("creer", "➕ Add / create a new plugin"),
+                ("installer", "🛒 Install from the community marketplace"),
+                ("publier", "📤 Publish a plugin to the marketplace (auto-deploy)"),
+                ("desactiver", f"⏸  Disable a plugin ({len(actifs)} active)"),
+                ("reactiver", f"▶  Enable a disabled plugin ({len(inactifs)} off)"),
+                ("supprimer", "🗑  Delete a plugin file"),
+            ],
+        )
+        if action is None:
+            return          # Esc au menu principal -> on quitte le hub
+        _action_plugins(action, actifs, inactifs)
 
+
+def _action_plugins(action: str, actifs: list, inactifs: list) -> None:
+    """Execute UNE action du hub /plugins ; un return = retour au menu."""
     if action == "voir":
         ui.afficher_plugins(plugins.liste(), plugins.erreurs())
         return
@@ -744,6 +755,8 @@ def _menu_modele(agent: AgentLoop) -> None:
         options,
         defaut=config.model if any(config.model == m for m, _ in options) else None,
     )
+    if choix is ui.ANNULE:
+        return  # Esc : on garde le modele courant, sans repli numerote
     if choix is None:
         # Selecteur indisponible (pas de prompt_toolkit / pas de TTY) ou Esc :
         # repli en saisie numerotee, comme /image.

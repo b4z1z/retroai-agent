@@ -509,17 +509,25 @@ def erreur(texte: str) -> None:
 # defilent autour de la selection).
 _SELECTEUR_FENETRE = 12
 
+# Sentinelle renvoyee par selecteur() quand l'utilisateur ANNULE (Esc).
+# Distincte de None (= selecteur INDISPONIBLE -> l'appelant fait un repli
+# numerote). BUG REEL corrige : Esc renvoyait None, confondu avec
+# "indisponible" -> le menu numerote s'affichait au lieu d'annuler.
+ANNULE = object()
+
 
 def selecteur(titre: str, texte: str, options: list, defaut=None):
     """
     Menu a FLECHES 100 % CLAVIER : ↑/↓ deplacent, ENTER valide directement,
     ESC annule — plus AUCUN bouton OK/Cancel a atteindre (retour utilisateur :
     l'ancien radiolist_dialog obligeait Tab/souris pour valider). Les chiffres
-    1-9 sautent a l'option correspondante. Retourne la valeur choisie, ou
-    None si annule / indisponible (l'appelant gere alors un repli numerote).
+    1-9 sautent a l'option correspondante.
+
+    Retourne : la valeur choisie ; ui.ANNULE si l'utilisateur annule (Esc) ;
+    None si le selecteur est INDISPONIBLE (pas de prompt_toolkit / pas de
+    TTY / erreur) — seul ce dernier cas justifie un repli numerote.
 
     options : liste de couples (valeur, libelle_affiche).
-    Necessite prompt_toolkit + un vrai terminal ; sinon renvoie None.
     """
     if not (PTK_DISPO and sys.stdin.isatty()) or not options:
         return None
@@ -576,7 +584,7 @@ def selecteur(titre: str, texte: str, options: list, defaut=None):
         @kb.add("c-c")
         @kb.add("q")
         def _(event):
-            event.app.exit(result=None)
+            event.app.exit(result=ANNULE)
 
         # Chiffres 1-9 : saut direct a l'option n.
         for n in range(1, min(len(options), 9) + 1):

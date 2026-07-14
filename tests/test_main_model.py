@@ -49,6 +49,39 @@ def test_changement_applique_a_chaud_et_persiste(tmp_path, monkeypatch):
     )
 
 
+def test_esc_annule_sans_repli_numerote(tmp_path, monkeypatch):
+    """BUG REEL corrige : Esc dans le selecteur renvoyait None, confondu
+    avec 'selecteur indisponible' -> le repli NUMEROTE s'affichait au lieu
+    d'annuler. Desormais Esc (ui.ANNULE) annule NET : aucun repli."""
+    agent = _agent(tmp_path, monkeypatch)
+    monkeypatch.setattr(ui, "selecteur", lambda *a, **k: ui.ANNULE)
+
+    def interdit(invite):
+        raise AssertionError("le repli numerote ne doit PAS s'afficher")
+    monkeypatch.setattr(ui, "demander_texte", interdit)
+
+    main_mod._menu_modele(agent)
+
+    assert agent.config.model == "nvidia/nemotron-3-ultra-550b-a55b"
+    assert not (tmp_path / ".env").exists()
+
+
+def test_choisir_esc_vs_indisponible(tmp_path, monkeypatch):
+    """_choisir : ANNULE -> None direct ; None (indisponible) -> repli."""
+    monkeypatch.chdir(tmp_path)
+    options = [("a", "Option A"), ("b", "Option B")]
+
+    monkeypatch.setattr(ui, "selecteur", lambda *a, **k: ui.ANNULE)
+    monkeypatch.setattr(ui, "demander_texte",
+                        lambda invite: (_ for _ in ()).throw(
+                            AssertionError("pas de repli sur Esc")))
+    assert main_mod._choisir("T", "t", options) is None
+
+    monkeypatch.setattr(ui, "selecteur", lambda *a, **k: None)
+    monkeypatch.setattr(ui, "demander_texte", lambda invite: "2")
+    assert main_mod._choisir("T", "t", options) == "b"  # repli numerote OK
+
+
 def test_annulation_ne_change_rien(tmp_path, monkeypatch):
     agent = _agent(tmp_path, monkeypatch)
     monkeypatch.setattr(ui, "selecteur", lambda *a, **k: None)  # Esc / pas de TTY
