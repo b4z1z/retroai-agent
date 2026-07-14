@@ -2812,3 +2812,10 @@ ui.attendre_touche() (NOUVEAU) — attend N'IMPORTE QUELLE touche (msvcrt.getch
 sous Windows, tty raw ailleurs, repli Entree, jamais bloquant hors TTY,
 verifie) — appelee apres l'affichage du panneau : "Press any key to go back
 to the menu…". Pushe (f396b00).
+GENERALISATION (demande "same thing for all the menu") : la pause est
+CENTRALISEE dans la boucle du hub — _action_plugins() retourne un booleen
+"quelque chose a ete AFFICHE ?" : True (panneau, succes, erreur, guide PR,
+avertissement...) -> pause "press any key" ; False (annulation silencieuse :
+Esc dans une sous-liste, Ctrl+C, refus y/n, ouverture navigateur) -> retour
+DIRECT au menu, pas de touche inutile. 12 chemins silencieux identifies.
+Pushe (c81e87e). 210 tests.
