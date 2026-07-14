@@ -2819,3 +2819,29 @@ avertissement...) -> pause "press any key" ; False (annulation silencieuse :
 Esc dans une sous-liste, Ctrl+C, refus y/n, ouverture navigateur) -> retour
 DIRECT au menu, pas de touche inutile. 12 chemins silencieux identifies.
 Pushe (c81e87e). 210 tests.
+
+----------------------------------------------------------------
+[2026-07-14] PUBLICATION : anti-doublon en cascade nom -> contenu -> IA
+----------------------------------------------------------------
+Demande : ne pas republier un plugin deja present ; comparer nom + contenu,
+et faire VERIFIER PAR L'IA si c'est la meme logique.
+1) plugins.comparer_au_marketplace(nom) -> "absent" (jamais publie, flux
+   normal) / "identique" (contenus exactement egaux, strip pres -> message
+   "nothing to republish", on s'arrete) / "different" (mise a jour
+   potentielle).
+2) Cas "different" -> JUGE IA (main._comparer_par_ia) : envoie les DEUX
+   versions au modele (tronquees a 6000 chars), verdict en UNE ligne :
+   "SAME ..." (cosmetique : commentaires, formatage) ou "UPDATED ..."
+   (comportement change) + raison courte. SAME -> on propose de garder la
+   version publiee (republier quand meme = y/n) ; UPDATED -> flux de
+   publication normal (c'est une vraie mise a jour). IA injoignable ->
+   None, jamais bloquant (on continue en manuel).
+3) Plomberie : l'agent entre dans le hub (_menu_plugins(agent)) pour donner
+   son client API au juge.
+VALIDE EN REEL (nemotron) : refactor cosmetique (commentaire + variable
+intermediaire) -> "SAME - only comments and variable assignment differ" ;
+changement x2 -> x3 -> "UPDATED - multiplication factor changed from 2 to
+3". Verdicts exacts.
+TESTS : +1 (comparer_au_marketplace : absent/identique/different/inconnu).
+210 -> 211, tous OK.
+ETAT : TERMINE ET VALIDE EN REEL.

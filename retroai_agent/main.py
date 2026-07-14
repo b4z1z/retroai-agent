@@ -153,7 +153,7 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             _menu_modele(agent)
             continue
         if saisie == "/plugins":
-            _menu_plugins()
+            _menu_plugins(agent)
             continue
         if saisie == "/memory":
             _menu_memoire()
@@ -484,7 +484,42 @@ def _choisir(titre: str, texte: str, options: list):
     return None
 
 
-def _menu_plugins() -> None:
+def _comparer_par_ia(agent: AgentLoop, nom: str) -> str | None:
+    """
+    Demande au MODELE si la version LOCALE d'un plugin a la meme LOGIQUE que
+    la version PUBLIEE (changements cosmetiques vs vraie mise a jour).
+    Retourne une ligne de verdict ("SAME ..." / "UPDATED ...") ou None si
+    l'IA est injoignable / fichiers illisibles — jamais bloquant.
+    """
+    infos = next((p for p in plugins.liste() if p["nom"] == nom), None)
+    if infos is None:
+        return None
+    fichier = os.path.basename(infos["fichier"])
+    try:
+        with open(infos["fichier"], encoding="utf-8") as f:
+            locale = f.read()[:6000]
+        with open(os.path.join(plugins.RACINE_MARKETPLACE, "plugins", fichier),
+                  encoding="utf-8") as f:
+            publiee = f.read()[:6000]
+    except OSError:
+        return None
+    question = (
+        "Compare these two versions of a Python plugin. Answer with EXACTLY "
+        "one line: start with SAME if the logic/behavior is identical (only "
+        "comments, formatting or cosmetic differences), or UPDATED if the "
+        "behavior actually changed — then a very short reason.\n"
+        "--- PUBLISHED VERSION ---\n" + publiee +
+        "\n--- LOCAL VERSION ---\n" + locale
+    )
+    try:
+        reponse = agent.client.chat([{"role": "user", "content": question}])
+        contenu = (reponse["choices"][0]["message"].get("content") or "").strip()
+        return contenu.splitlines()[0][:160] if contenu else None
+    except Exception:
+        return None
+
+
+def _menu_plugins(agent: AgentLoop) -> None:
     """
     Commande /plugins : hub de gestion des plugins, en BOUCLE : apres chaque
     action (ou l'annulation d'un sous-menu), on REVIENT au menu principal —
@@ -519,11 +554,12 @@ def _menu_plugins() -> None:
         # menu") : si l'action a AFFICHE quelque chose (True), on attend une
         # touche avant que la boucle ne recouvre l'ecran avec le menu ;
         # une annulation silencieuse (False) revient au menu directement.
-        if _action_plugins(action, actifs, inactifs):
+        if _action_plugins(action, actifs, inactifs, agent):
             ui.attendre_touche("Press any key to go back to the menu…")
 
 
-def _action_plugins(action: str, actifs: list, inactifs: list) -> bool:
+def _action_plugins(action: str, actifs: list, inactifs: list,
+                    agent: AgentLoop) -> bool:
     """
     Execute UNE action du hub /plugins. Retourne True si quelque chose a ete
     AFFICHE (panneau, succes, erreur, guide) -> la boucle marquera une pause ;
@@ -565,6 +601,30 @@ def _action_plugins(action: str, actifs: list, inactifs: list) -> bool:
                              for p in actifs])
         if fichier_ou_nom is None:
             return False
+        # ANTI-DOUBLON : nom deja publie ? -> comparer les CONTENUS ; si
+        # identiques, republier ne sert a rien ; s'ils different, on demande
+        # a l'IA si la LOGIQUE a vraiment change (ou si c'est cosmetique).
+        etat = plugins.comparer_au_marketplace(fichier_ou_nom)
+        if etat == "identique":
+            ui.info(f"'{fichier_ou_nom}' is ALREADY published with the exact "
+                    "same content — nothing to republish.")
+            return True
+        if etat == "different":
+            ui.info("A version of this plugin is already published — asking "
+                    "the AI whether the logic really changed…")
+            verdict = _comparer_par_ia(agent, fichier_ou_nom)
+            if verdict:
+                ui.info(f"AI check: {verdict}")
+            if verdict and verdict.upper().startswith("SAME"):
+                try:
+                    ok = ui.demander_texte(
+                        "Same logic according to the AI — republish anyway? "
+                        "(y/n):").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    return False
+                if ok not in ("y", "yes", "o", "oui"):
+                    ui.info("Kept the published version.")
+                    return True
         try:
             auteur = ui.demander_texte(
                 "Author name shown on the site (Enter = B4Z1Z):"

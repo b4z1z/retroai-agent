@@ -188,6 +188,41 @@ def test_publier_copie_registre_et_site(tmp_path):
         plugins.activer(str(tmp_path / "inexistant"))
 
 
+def test_comparer_au_marketplace(tmp_path):
+    """Anti-doublon de publication : absent -> publier ; identique -> inutile
+    de republier ; contenu different -> mise a jour potentielle (l'IA
+    departage ensuite cosmetique vs vraie evolution)."""
+    d = _dossier(tmp_path)
+    (d / "outil.py").write_text(CODE_VALIDE, encoding="utf-8")
+    plugins.activer(str(d))
+    racine = tmp_path / "marketplace"
+    (racine / "plugins").mkdir(parents=True)
+    (racine / "registry.json").write_text(
+        '{"version": 1, "plugins": []}', encoding="utf-8")
+    (racine / "index.html").write_text(
+        "<script>\n/* REGISTRY-START */\nvar REGISTRY = {};\n"
+        "/* REGISTRY-END */\n</script>", encoding="utf-8")
+    try:
+        # Jamais publie.
+        assert plugins.comparer_au_marketplace(
+            "outil_test", racine=str(racine)) == "absent"
+        # Publie -> contenu identique.
+        assert plugins.publier("outil_test", racine=str(racine)) is None
+        assert plugins.comparer_au_marketplace(
+            "outil_test", racine=str(racine)) == "identique"
+        # Version locale modifiee -> different.
+        (d / "outil.py").write_text(
+            CODE_VALIDE.replace('return "ok"', 'return "ok!"'),
+            encoding="utf-8")
+        assert plugins.comparer_au_marketplace(
+            "outil_test", racine=str(racine)) == "different"
+        # Plugin non charge -> absent (pas d'erreur).
+        assert plugins.comparer_au_marketplace(
+            "inconnu", racine=str(racine)) == "absent"
+    finally:
+        plugins.activer(str(tmp_path / "inexistant"))
+
+
 def test_synchroniser_site_le_vrai_depot():
     """synchroniser_site() sur le VRAI depot doit etre un no-op propre
     (registre et inline deja identiques) et ne rien casser."""

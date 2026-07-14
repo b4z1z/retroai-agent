@@ -224,6 +224,41 @@ def synchroniser_site(racine: str = RACINE_MARKETPLACE) -> str | None:
         return f"Could not sync the site: {exc}"
 
 
+def comparer_au_marketplace(nom: str,
+                            racine: str = RACINE_MARKETPLACE) -> str:
+    """
+    Etat du plugin CHARGE 'nom' vis-a-vis du marketplace local :
+      - "absent"    : jamais publie -> publication normale ;
+      - "identique" : deja publie avec EXACTEMENT le meme contenu -> inutile
+                      de republier ;
+      - "different" : deja publie mais le contenu a change -> mise a jour
+                      potentielle (l'appelant peut demander a l'IA si la
+                      logique a vraiment change).
+    """
+    import json
+
+    infos = _REGISTRE.get(nom)
+    if infos is None:
+        return "absent"
+    fichier = os.path.basename(infos["fichier"])
+    chemin_publie = os.path.join(racine, "plugins", fichier)
+    try:
+        with open(os.path.join(racine, "registry.json"), encoding="utf-8") as f:
+            noms_publies = {e.get("nom") for e in json.load(f)["plugins"]}
+    except Exception:
+        noms_publies = set()
+    if nom not in noms_publies and not os.path.exists(chemin_publie):
+        return "absent"
+    try:
+        with open(infos["fichier"], encoding="utf-8") as f:
+            local = f.read()
+        with open(chemin_publie, encoding="utf-8") as f:
+            publie = f.read()
+    except OSError:
+        return "different"  # entree registre sans fichier (ou illisible)
+    return "identique" if local.strip() == publie.strip() else "different"
+
+
 def publier(nom: str, auteur: str = "B4Z1Z",
             racine: str = RACINE_MARKETPLACE) -> str | None:
     """
