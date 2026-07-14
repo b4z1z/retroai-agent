@@ -505,28 +505,103 @@ def erreur(texte: str) -> None:
         print(f"  [Erreur] {texte}")
 
 
+# Nombre max de lignes d'options affichees en meme temps (les longues listes
+# defilent autour de la selection).
+_SELECTEUR_FENETRE = 12
+
+
 def selecteur(titre: str, texte: str, options: list, defaut=None):
     """
-    Menu a FLECHES (haut/bas) pour choisir parmi 'options'. Retourne la valeur
-    choisie, ou None si annule / indisponible (l'appelant gere alors un repli).
+    Menu a FLECHES 100 % CLAVIER : ↑/↓ deplacent, ENTER valide directement,
+    ESC annule — plus AUCUN bouton OK/Cancel a atteindre (retour utilisateur :
+    l'ancien radiolist_dialog obligeait Tab/souris pour valider). Les chiffres
+    1-9 sautent a l'option correspondante. Retourne la valeur choisie, ou
+    None si annule / indisponible (l'appelant gere alors un repli numerote).
 
     options : liste de couples (valeur, libelle_affiche).
     Necessite prompt_toolkit + un vrai terminal ; sinon renvoie None.
     """
-    if not (PTK_DISPO and sys.stdin.isatty()):
+    if not (PTK_DISPO and sys.stdin.isatty()) or not options:
         return None
     try:
-        from prompt_toolkit.shortcuts import radiolist_dialog
+        from prompt_toolkit.application import Application
+        from prompt_toolkit.key_binding import KeyBindings as _KB
+        from prompt_toolkit.layout import Layout, Window
+        from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.styles import Style
 
-        style = Style.from_dict({
-            "dialog frame.label": f"bg:{ACCENT} #ffffff",
-            "button.focused": f"bg:{ACCENT} #ffffff",
-            "radio-selected": f"{ACCENT}",
-        })
-        return radiolist_dialog(
-            title=titre, text=texte, values=options, default=defaut, style=style
-        ).run()
+        etat = {"i": 0}
+        for i, (valeur, _) in enumerate(options):
+            if defaut is not None and valeur == defaut:
+                etat["i"] = i
+                break
+
+        def _fragments():
+            frags = [("class:titre", f" {titre} "), ("", "\n"),
+                     ("class:texte", texte), ("", "\n\n")]
+            # Fenetre glissante : les longues listes defilent avec le curseur.
+            total = len(options)
+            debut = max(0, min(etat["i"] - _SELECTEUR_FENETRE // 2,
+                               total - _SELECTEUR_FENETRE))
+            fin = min(total, debut + _SELECTEUR_FENETRE)
+            if debut > 0:
+                frags.append(("class:aide", "   … ↑\n"))
+            for i in range(debut, fin):
+                libelle = options[i][1]
+                if i == etat["i"]:
+                    frags.append(("class:choisi", f" ❯ {libelle}\n"))
+                else:
+                    frags.append(("", f"   {libelle}\n"))
+            if fin < total:
+                frags.append(("class:aide", "   … ↓\n"))
+            frags.append(("class:aide",
+                          "\n ↑/↓ move · Enter = OK · Esc = cancel"))
+            return frags
+
+        kb = _KB()
+
+        @kb.add("up")
+        def _(event):
+            etat["i"] = (etat["i"] - 1) % len(options)
+
+        @kb.add("down")
+        def _(event):
+            etat["i"] = (etat["i"] + 1) % len(options)
+
+        @kb.add("enter")
+        def _(event):
+            event.app.exit(result=options[etat["i"]][0])
+
+        @kb.add("escape", eager=True)
+        @kb.add("c-c")
+        @kb.add("q")
+        def _(event):
+            event.app.exit(result=None)
+
+        # Chiffres 1-9 : saut direct a l'option n.
+        for n in range(1, min(len(options), 9) + 1):
+            @kb.add(str(n))
+            def _(event, n=n):
+                etat["i"] = n - 1
+
+        hauteur = min(len(options), _SELECTEUR_FENETRE) + 6
+        application = Application(
+            layout=Layout(Window(
+                FormattedTextControl(_fragments, focusable=True),
+                height=hauteur, wrap_lines=False,
+            )),
+            key_bindings=kb,
+            full_screen=False,
+            erase_when_done=True,
+            mouse_support=False,
+            style=Style.from_dict({
+                "titre": f"bold bg:{ACCENT} #ffffff",
+                "texte": "#8a8a8a",
+                "choisi": f"bold {ACCENT}",
+                "aide": "#8a8a8a",
+            }),
+        )
+        return application.run()
     except Exception:
         return None
 

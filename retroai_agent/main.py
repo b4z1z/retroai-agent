@@ -497,6 +497,7 @@ def _menu_plugins() -> None:
         f"marketplace: {plugins.URL_SITE}",
         [
             ("voir", f"📋 See installed plugins ({len(actifs)})"),
+            ("site", "🌐 Open the marketplace website in your browser"),
             ("creer", "➕ Add / create a new plugin"),
             ("installer", "🛒 Install from the community marketplace"),
             ("publier", "📤 Publish a plugin to the marketplace (auto-deploy)"),
@@ -510,6 +511,15 @@ def _menu_plugins() -> None:
 
     if action == "voir":
         ui.afficher_plugins(plugins.liste(), plugins.erreurs())
+        return
+
+    if action == "site":
+        import webbrowser
+        try:
+            webbrowser.open(plugins.URL_SITE)
+            ui.succes(f"Opened {plugins.URL_SITE} in your browser.")
+        except Exception:
+            ui.info(f"Could not open a browser — visit {plugins.URL_SITE}")
         return
 
     if action == "creer":

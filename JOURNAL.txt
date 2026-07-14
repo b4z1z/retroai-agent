@@ -2748,3 +2748,27 @@ TESTS : test_memoire.py (6 : CRUD+doublons, plafond FIFO, injection systeme,
 memoire vide = pas d'injection, outil branche au schema+dispatch, gitignore).
 202 -> 208, tous OK.
 ETAT : TERMINE ET VALIDE EN REEL. (/restart puis "retiens que ...")
+
+----------------------------------------------------------------
+[2026-07-14] UX : selecteur 100% clavier + ouvrir le site depuis /plugins
+----------------------------------------------------------------
+Retour utilisateur : "dans les menus c'est chiant d'utiliser la souris pour
+faire OK". Cause : radiolist_dialog (prompt_toolkit) exige Tab jusqu'au
+bouton OK (ou la souris) apres avoir choisi.
+1) ui.selecteur REECRIT en Application prompt_toolkit maison, sans AUCUN
+   bouton : ↑/↓ deplacent (avec bouclage), ENTER valide DIRECTEMENT l'option
+   surlignee (❯, accent rouge), ESC / q / Ctrl+C annulent, chiffres 1-9
+   sautent a l'option n. Longues listes : fenetre glissante de 12 lignes
+   avec indicateurs "… ↑/↓" (les 15 plugins du marketplace defilent).
+   full_screen=False + erase_when_done -> le menu s'efface apres choix.
+   Meme signature (titre, texte, options, defaut) -> TOUS les menus en
+   profitent d'un coup : /think, /model, /sessions, /plugins et sous-menus.
+   Toute exception -> None -> repli numerote existant (jamais bloquant).
+2) /plugins > "🌐 Open the marketplace website" : ouvre URL_SITE
+   (retroai-agent.vercel.app) dans le navigateur via webbrowser (stdlib),
+   repli message avec l'URL si pas de navigateur.
+NOTE : outputs/plugin_manager_test.py renomme en _demo.py (pytest collectait
+ce vieil artefact bac-a-sable des qu'on lancait les tests hors du dossier).
+208 tests OK.
+ETAT : TERMINE. (/restart puis /think ou /plugins pour sentir le nouveau
+selecteur — Enter valide direct.)
