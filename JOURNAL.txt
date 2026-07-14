@@ -2719,3 +2719,32 @@ NATIF sur chaque PR — zero infra a construire). Implementation :
 202 tests. LECON (pour le walkthrough final) : un secret verifie cote client
 n'est jamais une barriere ; la vraie autorisation vit cote serveur — ici,
 les droits de push GitHub.
+
+----------------------------------------------------------------
+[2026-07-14] MEMOIRE PERSISTANTE entre sessions 🧠
+----------------------------------------------------------------
+Demande utilisateur : "connexion entre sessions pour se rappeler des
+details". Implementation (philosophie BAZIZ.IA : simple, un fichier) :
+1) memoire.py (NOUVEAU) : memoire.json local (gitignore, donnees perso) =
+   liste de FAITS courts {texte, date}. ajouter() (doublons exacts ignores,
+   texte plafonne 300 chars), oublier(index), vider(), charger(),
+   texte_pour_prompt(). PLAFOND 50 faits (FIFO : les plus anciens sortent) —
+   important car la memoire part dans CHAQUE message systeme, donc chaque
+   appel API : la garder courte = garder les couts et la latence bas.
+2) OUTIL DU COEUR `remember` (5e outil, tools.py) : risque faible, pas de
+   confirmation. Le MODELE le declenche seul quand l'utilisateur partage un
+   detail durable (preference, nom, decision, "retiens que...").
+3) INJECTION au demarrage : AgentLoop.reset() ajoute le bloc "MEMORY -
+   facts you saved in past sessions" au message systeme -> chaque NOUVELLE
+   conversation demarre en connaissant les faits. Section MEMORY du prompt :
+   utiliser remember sans qu'on le demande, PAS de secrets (mdp, cles).
+4) /memory : voir les faits (numerotes, dates), oublier UN fait (numero) ou
+   TOUT ('all'). Declare dans COMMANDES + AIDE_LOGICIEL.
+VALIDE EN REEL (nemotron, 2 sessions distinctes) : S1 "Retiens que mon plat
+prefere est le couscous" -> l'agent appelle remember DE LUI-MEME -> S2
+(conversation neuve) "Quel est mon plat prefere ?" -> "couscous". La boucle
+memoire complete marche.
+TESTS : test_memoire.py (6 : CRUD+doublons, plafond FIFO, injection systeme,
+memoire vide = pas d'injection, outil branche au schema+dispatch, gitignore).
+202 -> 208, tous OK.
+ETAT : TERMINE ET VALIDE EN REEL. (/restart puis "retiens que ...")

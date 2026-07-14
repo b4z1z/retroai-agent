@@ -32,6 +32,7 @@ from . import thinking
 from . import sessions
 from . import tuto
 from . import plugins
+from . import memoire
 
 
 def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
@@ -152,6 +153,9 @@ def boucle_cli(agent: AgentLoop, modele: str, pseudo: str = "") -> None:
             continue
         if saisie == "/plugins":
             _menu_plugins()
+            continue
+        if saisie == "/memory":
+            _menu_memoire()
             continue
         if saisie == "/create-image" or saisie.startswith("/create-image "):
             # Description optionnelle sur la meme ligne :
@@ -420,6 +424,38 @@ def _menu_image(agent: AgentLoop) -> None:
         return
 
     ui.erreur(f"Unknown choice: {choix}")
+
+
+def _menu_memoire() -> None:
+    """
+    Commande /memory : voir ce que l'agent a memorise (outil remember),
+    oublier UN fait ou TOUT oublier. Les faits sont reinjectes au demarrage
+    de chaque nouvelle conversation (message systeme).
+    """
+    faits = memoire.charger()
+    if not faits:
+        ui.info("Memory is empty. The agent saves facts with its 'remember' "
+                "tool — or just tell it: \"retiens que ...\".")
+        return
+    ui.info(f"🧠 {len(faits)} memorized fact(s) — shared with every new "
+            "conversation:")
+    for i, fait in enumerate(faits, start=1):
+        ui.info(f"  {i:2}. {fait.get('texte', '')}  ({fait.get('date', '?')})")
+    try:
+        reponse = ui.demander_texte(
+            "Forget? (number = one fact, 'all' = everything, Enter = keep):"
+        ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return
+    if not reponse:
+        return
+    if reponse in ("all", "tout"):
+        memoire.vider()
+        ui.succes("Memory cleared.")
+    elif reponse.isdigit() and memoire.oublier(int(reponse)):
+        ui.succes(f"Fact {reponse} forgotten.")
+    else:
+        ui.erreur(f"Unknown choice: {reponse}")
 
 
 def _choisir(titre: str, texte: str, options: list) -> str | None:

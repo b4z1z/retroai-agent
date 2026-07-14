@@ -138,6 +138,30 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "remember",
+            "description": (
+                "Save a SHORT lasting fact to your persistent memory: it "
+                "survives across sessions and is shown to you at the start "
+                "of every future conversation. Use it when the user shares "
+                "a durable preference, decision, name or detail (e.g. "
+                "'retiens que...', 'je prefere...', 'mon projet s'appelle "
+                "...'). One short sentence per fact."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fact": {
+                        "type": "string",
+                        "description": "The fact to remember (one short sentence).",
+                    }
+                },
+                "required": ["fact"],
+            },
+        },
+    },
 ]
 
 
@@ -319,11 +343,21 @@ def _outil_run_shell_command(args: dict, config: Config) -> str:
 # --------------------------------------------------------------------------- #
 #  3. Table de routage : nom d'outil -> fonction                              #
 # --------------------------------------------------------------------------- #
+def _outil_remember(args: dict, config: Config) -> str:
+    """Memoire persistante : risque FAIBLE (petit fichier local memoire.json,
+    plafonne), pas de confirmation — comme read/list."""
+    from . import memoire
+    fait = args.get("fact", "")
+    ui.action_outil("remember", fait[:60])
+    return memoire.ajouter(fait)
+
+
 TOOLS = {
     "read_file": _outil_read_file,
     "write_file": _outil_write_file,
     "list_directory": _outil_list_directory,
     "run_shell_command": _outil_run_shell_command,
+    "remember": _outil_remember,
 }
 
 

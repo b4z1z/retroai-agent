@@ -1002,6 +1002,7 @@ COMMANDES = [
     ("/tuto", "Replay the interactive getting-started tour"),
     ("/model", "Pick the CHAT model (applied instantly, kept until changed)"),
     ("/plugins", "Plugin hub: see / install (marketplace) / disable / delete"),
+    ("/memory", "See or forget what the agent remembers across sessions"),
     ("/image", "Image panel: choose the generation model (FLUX / Nano Banana)"),
     ("/add-image", "Pick an image via a file dialog and send it"),
     ("/add-file", "Attach a text/code file's content for analysis"),

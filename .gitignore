@@ -3,6 +3,8 @@
 
 # Donnees personnelles : profil utilisateur local.
 user_profile.json
+# Memoire persistante de l'agent (faits retenus entre sessions).
+memoire.json
 
 # Conversations sauvegardees (multi-sessions, /continue, /sessions, /new).
 sessions/

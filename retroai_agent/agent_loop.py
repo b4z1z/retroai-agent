@@ -33,6 +33,7 @@ from . import images
 from . import modes
 from . import thinking
 from . import sessions
+from . import memoire
 
 
 def _description_plateforme() -> str:
@@ -94,6 +95,13 @@ SYSTEME = (
     "move to the next step. Never dump the whole project in a single giant "
     "response: small incremental steps keep the progress safe (it is saved "
     "after every step and can be resumed with /continue).\n"
+    "MEMORY - you have a PERSISTENT memory across sessions: the remember "
+    "tool saves a short fact to a local file, and every saved fact is shown "
+    "to you at the start of future conversations (MEMORY section below, "
+    "when present). USE IT without being asked whenever the user shares a "
+    "durable detail: a preference ('je prefere...'), a decision, a name, a "
+    "goal, or says 'retiens/rappelle-toi'. Do NOT save trivia or secrets "
+    "(passwords, keys). The user manages memories with /memory.\n"
     "PLUGINS - you are EXTENSIBLE. Each .py file in the plugins/ folder adds "
     "a tool to you: it defines OUTIL = {name, description, parameters} (JSON "
     "schema), optionally DANGEREUX = True (asks user confirmation), and "
@@ -164,6 +172,9 @@ AIDE_LOGICIEL = (
     "Pull Request, which emails the owner to review and approve) ; "
     "disable / re-enable ; delete. All changes apply immediately. The "
     "marketplace site is at https://retroai-agent.vercel.app\n"
+    "- /memory : shows what you have memorized across sessions (remember "
+    "tool), lets the user forget one fact or everything. Memories are "
+    "injected at the start of every new conversation.\n"
     "- /model : pick the CHAT model (arrow menu). Shows the current model, "
     "offers verified NVIDIA models plus a custom entry (any id from "
     "build.nvidia.com/models, tool-calling required). The change applies "
@@ -293,6 +304,12 @@ class AgentLoop:
         contenu = SYSTEME + "\n\n" + A_PROPOS + "\n\n" + AIDE_LOGICIEL
         if self.infos_utilisateur:
             contenu = contenu + "\n\n" + self.infos_utilisateur
+        # MEMOIRE PERSISTANTE : les faits sauves lors des sessions passees
+        # (outil remember) sont reinjectes ici -> l'agent se souvient d'une
+        # conversation a l'autre sans rien demander.
+        souvenirs = memoire.texte_pour_prompt()
+        if souvenirs:
+            contenu = contenu + "\n\n" + souvenirs
         self.historique = [{"role": "system", "content": contenu}]
         self.tour_incomplet = False
         self.session_id = None
