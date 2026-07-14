@@ -514,34 +514,13 @@ def _menu_plugins() -> None:
         return
 
     if action == "site":
-        # Voir le marketplace = OUVRIR LE SITE (pas de liste dans le
-        # terminal). En ligne -> le site officiel (Vercel) ; hors ligne ->
-        # la copie locale marketplace/index.html (autonome : le catalogue
-        # est integre dedans, elle marche sans reseau).
-        import socket
+        # Voir le marketplace = OUVRIR LE SITE, point. (Pas de liste dans le
+        # terminal, et pas de repli hors-ligne : remarque juste de
+        # l'utilisateur — sans reseau, l'agent lui-meme ne marche pas, un
+        # mode hors-ligne du catalogue ne servirait a rien.)
         import webbrowser
-        from urllib.parse import urlparse
-
-        en_ligne = False
-        try:
-            hote = urlparse(plugins.URL_SITE).netloc or plugins.URL_SITE
-            socket.create_connection((hote, 443), timeout=3).close()
-            en_ligne = True
-        except OSError:
-            pass
-        if en_ligne:
-            webbrowser.open(plugins.URL_SITE)
-            ui.succes(f"Opened {plugins.URL_SITE} in your browser.")
-            return
-        chemin = os.path.abspath(
-            os.path.join(plugins.RACINE_MARKETPLACE, "index.html"))
-        if os.path.exists(chemin):
-            webbrowser.open("file:///" + chemin.replace("\\", "/"))
-            ui.info("You seem offline — opened your LOCAL copy of the "
-                    "marketplace instead.")
-        else:
-            ui.erreur(f"Offline and no local copy found — visit "
-                      f"{plugins.URL_SITE} once back online.")
+        webbrowser.open(plugins.URL_SITE)
+        ui.succes(f"Opened {plugins.URL_SITE} in your browser.")
         return
 
     if action == "creer":
