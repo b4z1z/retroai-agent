@@ -2778,3 +2778,9 @@ Detection rapide de connectivite (socket TCP 443 vers l'hote du site, 3s,
 pas de fetch de contenu) : EN LIGNE -> ouvre le site Vercel ; HORS LIGNE ->
 ouvre la COPIE LOCALE marketplace/index.html (autonome depuis l'integration
 du catalogue inline : marche sans reseau). Pushe (f8f3b45).
+SUITE — remarque utilisateur imparable ("hors ligne haha mais baziz.ia ne
+peut pas marcher hors ligne") : le repli hors-ligne etait de la SUR-
+INGENIERIE — sans reseau, l'agent lui-meme est mort (API NVIDIA), donc un
+catalogue consultable hors-ligne ne sert a rien. Simplifie : ouvrir le site,
+point (webbrowser.open, 3 lignes). LECON (walkthrough) : toujours se
+demander QUI utilisera un repli avant de le coder. Pushe (aa74439).
