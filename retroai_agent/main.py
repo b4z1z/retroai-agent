@@ -703,10 +703,12 @@ def _action_plugins(action: str, actifs: list, inactifs: list,
             ui.info("The marketplace is empty for now.")
             return True
         deja = {p["nom"] for p in plugins.liste()}
+        # Colonnes a largeur FIXE pour un alignement net ; le cadenas (emoji
+        # large de 2 cellules) va en FIN de ligne ou il ne decale rien.
         options = [
-            (i, f"{e['nom']:<16} — {e.get('description', '')[:48]}"
-                f"{'  🔐' if e.get('dangereux') else ''}"
-                f"{'  (installed)' if e['nom'] in deja else ''}")
+            (i, f"{e['nom']:<16} — {e.get('description', '')[:46]:<46}"
+                f"  {'(installed)' if e['nom'] in deja else '           '}"
+                f"{'  🔐' if e.get('dangereux') else ''}")
             for i, e in enumerate(entrees)
         ]
         idx = _choisir("Marketplace",
