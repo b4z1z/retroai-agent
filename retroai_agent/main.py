@@ -497,7 +497,7 @@ def _menu_plugins() -> None:
         f"marketplace: {plugins.URL_SITE}",
         [
             ("voir", f"📋 See installed plugins ({len(actifs)})"),
-            ("site", "🌐 Open the marketplace website in your browser"),
+            ("site", "🌐 See the marketplace (opens the website)"),
             ("creer", "➕ Add / create a new plugin"),
             ("installer", "🛒 Install from the community marketplace"),
             ("publier", "📤 Publish a plugin to the marketplace (auto-deploy)"),
