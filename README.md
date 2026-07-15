@@ -1,27 +1,35 @@
-# RetroAI Agent
+# RetroAI Agent (BAZIZ.IA)
 
-Client CLI **léger** transformant un terminal (Windows, Linux ou macOS) en
-**agent autonome** propulsé par l'API **NVIDIA NIM**. Pensé pour rester léger
-et tourner même sur une machine modeste.
+**Un agent de code en terminal, gratuit, qui s'étend tout seul.** Propulsé par
+le palier **gratuit** de l'API NVIDIA NIM, il lit/écrit vos fichiers et lance
+des commandes — et surtout, il **écrit ses propres outils** et les **partage
+avec une communauté**. Tourne partout, du PC moderne au vieux portable.
 
 ## Pourquoi ce projet ?
 
-Les agents de code en terminal (Claude Code et compagnie) sont géniaux, mais
-**pas toujours accessibles** : abonnement payant, machine récente exigée,
-compatibilité parfois capricieuse selon l'environnement. BAZIZ.IA est né de
-cette problématique :
+Les agents de code en terminal (Claude Code, Aider, OpenCode…) sont excellents
+— mais quasiment tous supposent que vous **payez une API** et tournez sur une
+machine récente. BAZIZ.IA occupe la case qu'ils laissent vide : **libre,
+gratuit, et fait pour être étendu par ceux qui l'utilisent.**
 
-- 💸 **100 % gratuit** — propulsé par le palier gratuit de l'API NVIDIA NIM
-  (une simple clé sur build.nvidia.com), aucun abonnement.
-- 🖥️ **Tourne partout** — du PC de bureau moderne au vieux portable : pas de
-  framework lourd, une seule vraie dépendance (`requests`).
-- ✨ **Une interface soignée** — expérience terminal inspirée de Claude Code :
-  streaming en direct, spinner de réflexion avec compteur de tokens, panneaux,
-  confirmations claires, sessions multiples, historique de saisie (flèche ↑),
-  tutoriel intégré.
+- 💸 **Vraiment gratuit** — le palier gratuit de l'API NVIDIA NIM (un email sur
+  build.nvidia.com, **pas de carte bancaire**), pas un « essai » déguisé. Un
+  assistant intégré vous obtient la clé au premier lancement.
+- 🧩 **Il s'auto-étend** — demandez-lui *« crée-toi un plugin météo »* : il
+  écrit le fichier, le charge à chaud, et gagne cette capacité **pour
+  toujours**. Un agent qui grandit au lieu de rester figé.
+- 🛒 **Un marché communautaire** — installez des plugins depuis un catalogue
+  partagé, ou publiez les vôtres en une commande ([auto-déployé en
+  ligne](https://retroai-agent.vercel.app)). L'écosystème appartient aux
+  utilisateurs, pas à un éditeur.
+- 🖥️ **Tourne partout** — pas de framework lourd, une seule vraie dépendance
+  (`requests`) ; pensé jusqu'au vieux portable.
+- ✨ **Sans sacrifier le confort** — streaming, mémoire entre sessions, undo,
+  diff avant écriture, sessions multiples, `/init` qui apprend votre projet.
 
-Bref : **l'expérience agent-dans-le-terminal, libre et gratuite**, quand les
-solutions du marché ne sont pas une option.
+> **Ce que ce n'est PAS :** un énième clone qui court après les stars des gros
+> harnais (OpenCode, Aider…). Ceux-là visent le développeur qui paie son API.
+> BAZIZ.IA vise l'inverse : **l'accès libre et l'auto-extension pour tous**.
 
 > 🧩 **N'importe quel modèle du catalogue NVIDIA NIM** — pas seulement Moonshot
 > AI. Vous choisissez librement via `NVIDIA_MODEL` dans `.env` : DeepSeek, Llama
@@ -30,10 +38,9 @@ solutions du marché ne sont pas une option.
 > liste complète est sur <https://build.nvidia.com/models>. Défaut :
 > `nvidia/nemotron-3-ultra-550b-a55b` (raisonnement + tool-calling, rapide).
 
-100 % ligne de commande, sans framework lourd. Dépendance principale :
-`requests`. L'agent peut lire/écrire des fichiers, lister des répertoires et
-exécuter des commandes shell — chaque action sensible étant **confirmée par
-l'utilisateur**.
+100 % ligne de commande. Chaque action sensible (écriture de fichier, commande
+shell) est **confirmée par l'utilisateur** — avec un *diff* de ce qui change,
+et un `/undo` pour tout annuler.
 
 ---
 
