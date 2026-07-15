@@ -37,6 +37,30 @@ l'utilisateur**.
 
 ---
 
+## 🚀 Démarrage rapide
+
+**Une commande, puis c'est parti.** L'assistant intégré s'occupe de la clé API
+(gratuite) au premier lancement — rien d'autre à configurer.
+
+**🪟 Windows** (PowerShell) :
+
+```powershell
+irm https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.ps1 | iex
+```
+
+**🐧 Linux / 🍎 macOS** (terminal) :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/b4z1z/retroai-agent/main/scripts/install.sh | sh
+```
+
+Puis lancez : **`baziz.ia`**
+
+> 👉 Dépannage, prérequis et installation manuelle : tout est détaillé dans
+> [Installation](#installation) plus bas. Pas besoin de les lire pour démarrer.
+
+---
+
 ## Fonctionnalités
 
 - 🔌 Appels à l'API NVIDIA NIM avec **retry + backoff exponentiel** sur les 429.
@@ -56,46 +80,15 @@ l'utilisateur**.
 
 ---
 
-## Prérequis (outils à avoir)
-
-Avant d'installer, il te faut quelques outils de base. **Vérifie** chacun avec
-`--version` ; **installe** seulement ceux qui manquent.
-
-### Linux / macOS
-
-| Outil | Vérifier | Installer s'il manque |
-|---|---|---|
-| **curl** (pour le one-liner) | `curl --version` | `sudo apt install curl` |
-| **git** | `git --version` | `sudo apt install git` |
-| **Python 3.8+** | `python3 --version` | `sudo apt install python3` |
-
-> 💡 `git` et `python3` sont aussi installés **automatiquement** par le script
-> d'installation rapide. En pratique, sur Linux Mint, seul **`curl`** doit être
-> présent au départ. Si une commande répond *« command not found »*, installe
-> l'outil correspondant avec la commande de droite.
-
-### Windows
-
-| Outil | Vérifier (PowerShell) | Installer s'il manque |
-|---|---|---|
-| **Git** | `git --version` | [git-scm.com/download/win](https://git-scm.com/download/win) |
-| **Python 3.8+** | `python --version` | [python.org/downloads](https://www.python.org/downloads/) — ⚠️ cocher **« Add Python to PATH »** à l'installation |
-| **curl / irm** | `irm --help` | déjà inclus dans Windows 10/11 |
-
-> ⚠️ Si `python` ou `git` répond *« n'est pas reconnu… »* après installation,
-> **ferme et rouvre** ton terminal (le PATH doit être rechargé). Si ça persiste,
-> c'est que l'option *« Add to PATH »* n'a pas été cochée → réinstalle en la
-> cochant.
-
----
-
 ## Installation
+
+*(Le [🚀 Démarrage rapide](#-démarrage-rapide) en haut suffit pour 99 % des cas.
+Cette section détaille chaque étape, le dépannage et l'installation manuelle.)*
 
 ### ⚡ Installation rapide — recommandée (une seule commande)
 
-C'est la méthode à utiliser dans 99 % des cas : **copiez, collez, Entrée** —
-le script s'occupe de tout (téléchargement, dépendances, commande `baziz.ia`,
-PATH).
+**Copiez, collez, Entrée** — le script s'occupe de tout (téléchargement,
+dépendances, commande `baziz.ia`, PATH).
 
 **🪟 Windows** — ouvrez *PowerShell* et collez :
 
@@ -130,6 +123,37 @@ terminal, enregistrée pour vous — **zéro fichier à éditer**. Détails :
 >    ```
 
 ---
+
+### 🧰 Prérequis (pour l'installation manuelle ou en cas de souci)
+
+<details>
+<summary>Les outils de base à avoir (l'installation rapide en pose la plupart toute seule)</summary>
+
+**Linux / macOS**
+
+| Outil | Vérifier | Installer s'il manque |
+|---|---|---|
+| **curl** (pour le one-liner) | `curl --version` | `sudo apt install curl` |
+| **git** | `git --version` | `sudo apt install git` |
+| **Python 3.8+** | `python3 --version` | `sudo apt install python3` |
+
+> 💡 `git` et `python3` sont aussi installés **automatiquement** par le script
+> d'installation rapide. En pratique, sur Linux Mint, seul **`curl`** doit être
+> présent au départ.
+
+**Windows**
+
+| Outil | Vérifier (PowerShell) | Installer s'il manque |
+|---|---|---|
+| **Git** | `git --version` | [git-scm.com/download/win](https://git-scm.com/download/win) |
+| **Python 3.8+** | `python --version` | [python.org/downloads](https://www.python.org/downloads/) — ⚠️ cocher **« Add Python to PATH »** à l'installation |
+| **curl / irm** | `irm --help` | déjà inclus dans Windows 10/11 |
+
+> ⚠️ Si `python` ou `git` répond *« n'est pas reconnu… »* après installation,
+> **ferme et rouvre** ton terminal (le PATH doit être rechargé). Si ça persiste,
+> c'est que l'option *« Add to PATH »* n'a pas été cochée → réinstalle en la
+> cochant.
+</details>
 
 ### 🛠️ Installation manuelle (avancé — si vous préférez tout contrôler)
 
